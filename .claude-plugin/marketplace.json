@@ -1,0 +1,16 @@
+{
+  "name": "agent-workflow",
+  "owner": {
+    "name": "DefaultPerson"
+  },
+  "plugins": [
+    {
+      "name": "agent-workflow",
+      "source": "./",
+      "description": "Spec-driven development pipeline: cleanup → clarify → execute → verify + autoresearch + ralph-loop",
+      "version": "1.1.0",
+      "category": "development",
+      "keywords": ["workflow", "spec-driven", "skills", "ralph-loop", "autoresearch"]
+    }
+  ]
+}
