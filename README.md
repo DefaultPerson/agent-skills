@@ -7,16 +7,14 @@ Built on the [harness pattern](https://www.anthropic.com/engineering/harness-des
 ## The Flow
 
 ```
-                /workflow:       /workflow:       /workflow:       /workflow:
-                 cleanup          clarify          execute          verify
- ┌────────┐                ┌────────┐        ┌────────┐        ┌────────┐
- │ notes  ├───────────────>│tasks+AC├───────>│  code  ├───────>│  PASS  │
- │ ideas  │   sort+verify  │proof   │        │commits │        │  FAIL  │
- │ chat   │   gap-check    │[P]marks│        │per task│        │  ?     │
- └────────┘                └───┬────┘        └───┬────┘        └────────┘
-                               │            worktree │
-                          [approval]        agents ◄──┘ fix loop
-                             gate               (max 3 rounds)
+ ┌────────┐  cleanup  ┌────────┐  clarify  ┌────────┐  execute  ┌────────┐  verify
+ │ notes  ├──────────>│  spec  ├──────────>│tasks+AC├──────────>│  code  ├─────────> PASS/FAIL
+ │ ideas  │           │ sorted │    ▲      │proof   │           │commits │
+ │ chat   │           │verified│    │      │[P]marks│           │per task│
+ └────────┘           └────────┘ approval  └────────┘           └───┬────┘
+                                   gate               worktree      │
+                                                      agents     ◄──┘ fix loop
+                                                               (max 3 rounds)
 ```
 
 All commands use the `workflow:` prefix:
