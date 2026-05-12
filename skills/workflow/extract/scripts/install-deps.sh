@@ -15,7 +15,6 @@ probe() {
 
 echo "=== extract skill dependency probe ==="
 probe yt-dlp
-probe tchan
 probe pandoc
 probe jq
 probe curl
@@ -24,8 +23,9 @@ cat <<EOF
 
 Install hints (user confirms before any install):
   yt-dlp:  pip install --user yt-dlp     OR  brew install yt-dlp
-  tchan:   pip install --user 'tchan[cli]'
   pandoc:  brew install pandoc           OR  dnf install pandoc
   jq:      brew install jq               OR  dnf install jq
   curl:    typically preinstalled
+
+Note: Telegram extraction uses curl + embed-page scrape (no extra tool needed).
 EOF

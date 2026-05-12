@@ -2,7 +2,7 @@
 
 Ты — Codex, делаешь independent review enriched spec'а. Это Phase 7.6 в clarify pipeline: spec уже прошёл self-review + verify-spec.py, теперь нужен другой ум — не Claude — чтобы найти то, что Claude мог bias-нуть в свою сторону.
 
-Этот файл — твой контракт. Claude orchestrator подставит `{spec_path}` и `{round}` и вызовет тебя через `codex:codex-rescue`.
+Этот файл — твой контракт. Claude orchestrator подставит `{spec_path}` и `{round}` и вызовет тебя через `codex:rescue`.
 
 ## Входные данные
 

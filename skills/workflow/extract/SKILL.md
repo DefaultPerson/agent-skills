@@ -5,7 +5,7 @@ description: >
   articles) whose content needs to be brought into the workspace before
   /cleanup or further analysis. Replaces each URL with a local pointer
   to extracted text. Tradeoff: YouTube subtitles via yt-dlp, public
-  Telegram via tchan/embed-scrape, generic HTML via pandoc/curl. Private
+  Telegram via embed-page scrape, generic HTML via pandoc/curl. Private
   or auth-required resources are out of scope. For 1-2 URLs, copy-paste
   is faster. Triggers: "extract", "/extract", "развернуть ссылки",
   "expand links", "fetch URLs", "извлеки контент".
@@ -37,7 +37,7 @@ Pull content out of every URL in a notes file (YouTube subtitles, Telegram post 
 ## Слабые стороны и когда НЕ использовать
 
 - **Не работает с private/auth resources.** Private Telegram channels, paywalled articles, logged-in-only pages — out of scope. Те URL вернут error в final report.
-- **Зависит от внешних tools (yt-dlp, tchan, pandoc).** Если они не установлены, скилл предложит install через AskUserQuestion. Никогда не auto-install без OK. Если пользователь отказывается — соответствующие URL получают error.
+- **Зависит от внешних tools (yt-dlp, pandoc).** Если они не установлены, скилл предложит install через AskUserQuestion. Никогда не auto-install без OK. Если пользователь отказывается — соответствующие URL получают error. (Telegram embed-scrape работает только через `curl` — он почти всегда есть.)
 - **Излишен для 1-2 URL'ов.** Copy-paste быстрее, чем pipeline. Используй только если 3+ URL.
 - **Длинные YouTube видео (>2h, ~30k слов).** Extract пройдёт, но downstream работа (cleanup) может задохнуться от объёма. Pre-trim'ить вручную если нужно.
 - **JS-heavy SPA сайты.** `extract-html.sh` использует curl — JS не выполняется. Получишь скелет страницы без контента. Используй для blog posts, articles, docs, НЕ для interactive web apps.
@@ -74,7 +74,7 @@ Pull content out of every URL in a notes file (YouTube subtitles, Telegram post 
 
 ## Роли
 
-`roles/interactive-prompt.md` — format для AskUserQuestion при obrabatывании `other`-типа URL (не YouTube, не Telegram). Substitution: `{url_short}` (первые 60 chars URL).
+`roles/interactive-prompt.md` — format для AskUserQuestion при обработке `other`-типа URL (не YouTube, не Telegram). Substitution: `{url_short}` (первые 60 chars URL).
 
 Scripts в `scripts/` — building blocks, скилл вызывает их через Bash:
 
@@ -82,7 +82,7 @@ Scripts в `scripts/` — building blocks, скилл вызывает их че
 |---|---|---|
 | `install-deps.sh` | Probe which tools installed | (none) |
 | `extract-youtube.sh` | yt-dlp wrapper, subtitle cleanup | `<url> <output-dir>` |
-| `extract-telegram.sh` | tchan / embed scrape | `<url> <output-dir>` |
+| `extract-telegram.sh` | public Telegram embed-page scrape | `<url> <output-dir>` |
 | `extract-html.sh` | pandoc / curl fallback | `<url> <output-dir>` |
 
 ## Что делает скилл (по шагам)

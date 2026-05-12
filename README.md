@@ -20,7 +20,7 @@ Three focused skills for the pre-implementation half of an AI coding workflow: p
 
 ## Skills
 
-- **`/extract`** — pull content out of every URL in a notes file (YouTube subtitles via yt-dlp, public Telegram via tchan, HTML via pandoc/curl). Replaces each URL with a local pointer, preserves originals, gitignores extracted content.
+- **`/extract`** — pull content out of every URL in a notes file (YouTube subtitles via yt-dlp, public Telegram via embed-page scrape, HTML via pandoc/curl). Replaces each URL with a local pointer, preserves originals, gitignores extracted content.
 - **`/cleanup`** — losslessly reorganize a messy notes/plan/chat dump into a clean sectioned markdown file. Three-level gap detection (deterministic URL check + per-section semantic agents + fuzzy coverage net) proves nothing was lost. Multi-file input → multi-file output (per-source pipelines, not merged).
 - **`/clarify`** — turn a clean spec into an implementation-ready document: atomic tasks with Given/When/Then acceptance criteria, shell-runnable proof commands, contracts (FR-NNN with MUST/SHOULD/MAY), edge cases, risks. Cross-model consensus loop with Codex (optional) catches issues single-model self-review misses.
 
@@ -39,7 +39,7 @@ Each skill follows the same template — `description` states triggers and trade
 /cleanup research-notes.md
 
 # 3. Decompose into atomic tasks with verifiable AC. Phase 7.6 invokes
-#    Codex via codex:codex-rescue (if installed) for cross-model review,
+#    Codex via codex:rescue (if installed) for cross-model review,
 #    iterates up to 3 rounds until consensus.
 /clarify research-notes.md
 
@@ -78,8 +78,8 @@ Optional: install [codex CLI](https://github.com/openai/codex) + the `codex` plu
 ## Prerequisites
 
 - **Required:** Git, `bash`, `jq`, `python3`.
-- **`/extract` deps** (probed at runtime, install prompt if missing): `yt-dlp` (YouTube), `tchan` (Telegram), `pandoc` (HTML — optional, falls back to crude curl).
-- **`/clarify` Phase 7.6 optional:** `codex` CLI + `codex:codex-rescue` skill for cross-model consensus.
+- **`/extract` deps** (probed at runtime, install prompt if missing): `yt-dlp` (YouTube subtitles), `pandoc` (HTML — optional, falls back to crude curl). Telegram works with just `curl`.
+- **`/clarify` Phase 7.6 optional:** `codex` CLI + `codex:rescue` skill for cross-model consensus.
 
 ## v2.0.0 breaking changes
 

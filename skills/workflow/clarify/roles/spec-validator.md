@@ -1,6 +1,6 @@
 # Spec validator — internal single-model fallback
 
-Используется в Phase 7.6 ТОЛЬКО когда codex недоступен (нет `codex:codex-rescue` skill / нет `codex` CLI на машине). Это fallback: одна модель проверяет свой же output — слабее, чем cross-model consensus, но всё ещё лучше, чем ничего.
+Используется в Phase 7.6 ТОЛЬКО когда codex недоступен (нет `codex:rescue` skill / нет `codex` CLI на машине). Это fallback: одна модель проверяет свой же output — слабее, чем cross-model consensus, но всё ещё лучше, чем ничего.
 
 Если codex доступен → используется `roles/codex-reviewer.md` + `roles/claude-self-assessor.md` вместо этого role.
 

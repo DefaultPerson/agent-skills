@@ -78,7 +78,7 @@ Last gate before the skill commits output. Three variants:
 **Read-only / side-effect:**
 > Прошёл бы этот результат ревью у синьора? Конкретно: проверка-1; проверка-2; проверка-3. Если "нет" — переделай, не отдавай.
 
-Placement: right before the Outputs section in SKILL.md. Reasoning — it's the last thing the model reads in its execution mental model, so it catches the commit-time omission rather than the planning-time omission.
+Placement: last section in SKILL.md, after Правила. Reasoning — it's the last thing the model reads in its execution mental model, so it catches the commit-time omission rather than the planning-time omission. See `references/skill-template.md` for the canonical section order.
 
 ## Role files vs SKILL.md
 
@@ -89,7 +89,7 @@ When a skill spawns subagents, separate the invocation contract from the role's 
 
 This separation lets you edit role behavior without re-reading orchestration logic, and vice versa. Also forces explicit variable contracts, which catches "I forgot to substitute X" bugs.
 
-Substitution helper (recommended): `scripts/substitute.py` reads `roles/<name>.md` + JSON variables → fully formed prompt. Removes manual substitution errors.
+Substitution today is manual: Claude reads `roles/<name>.md` via the Read tool, substitutes `{var}` placeholders inline before passing the result as a subagent prompt. A future enhancement could add `bin/substitute.sh` (read template + JSON vars → stdout) to reduce missed-variable errors — currently relies on the calling SKILL.md providing an explicit substitutions table.
 
 ## Length budgets
 

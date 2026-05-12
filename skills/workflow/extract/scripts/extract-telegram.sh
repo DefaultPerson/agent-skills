@@ -20,16 +20,10 @@ fi
 CHANNEL="${BASH_REMATCH[1]}"
 POST_ID="${BASH_REMATCH[2]}"
 
-# Strategy A: try tchan (if installed)
-if command -v tchan >/dev/null 2>&1; then
-  if tchan post "$CHANNEL/$POST_ID" > "$OUT/post.md" 2>/dev/null; then
-    echo "tchan: extracted $CHANNEL/$POST_ID" >&2
-    exit 0
-  fi
-  echo "tchan failed, falling back to embed scrape" >&2
-fi
-
-# Strategy B: fetch the public embed page (t.me uses /s/ prefix for public web view)
+# Strategy: fetch the public embed page (t.me's web view).
+# Note: tchan exists for channel-wide exports (CSV), not single-post pulls,
+# so we skip it for this script and go straight to the embed-page scrape,
+# which works for any public channel post without auth.
 EMBED_URL="https://t.me/${CHANNEL}/${POST_ID}?embed=1&mode=tme"
 HTML="$(curl -s -A 'Mozilla/5.0 (compatible; extract-skill/1.0)' --max-time 15 "$EMBED_URL" || true)"
 
