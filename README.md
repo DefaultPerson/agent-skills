@@ -5,17 +5,17 @@ Three focused skills for the pre-implementation half of an AI coding workflow: l
 ## The Flow
 
 ```
- ┌────────┐  cleanup  ┌──────────┐  extract  ┌────────────┐  clarify  ┌─────────┐    →   mattpocock:tdd
- │ notes  ├──────────>│  clean   ├──────────>│ clean with ├──────────>│ atomic  │    →   Claude Code goal feature
- │  with  │           │ markdown │           │  offline   │           │ tasks + │    →   manual implementation
- │ links  │           │ document │           │  content   │           │ AC with │    →   claude -p for AC verify
- └────────┘           └──────────┘           └────────────┘           │  proof  │
-                                                                     │commands │
-                                                                     └─────────┘
-                                                                          ▲
-                                                                          │
-                                                              Codex+Claude consensus
-                                                                (Phase 7.6 in clarify)
+ ┌────────┐  cleanup  ┌──────────┐  clarify  ┌─────────┐  extract  ┌────────────┐    →   mattpocock:tdd
+ │ notes  ├──────────>│  clean   ├──────────>│ atomic  ├──────────>│  tasks +   │    →   Claude Code goal feature
+ │  with  │           │ markdown │           │ tasks + │           │  offline   │    →   manual implementation
+ │ links  │           │ document │           │ AC with │           │   link     │    →   claude -p for AC verify
+ └────────┘           └──────────┘           │  proof  │           │  content   │
+                                             │commands │           └────────────┘
+                                             └─────────┘
+                                                  ▲
+                                                  │
+                                      Codex+Claude consensus
+                                        (Phase 7.6 in clarify)
 ```
 
 ## Skills
