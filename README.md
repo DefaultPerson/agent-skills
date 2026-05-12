@@ -24,7 +24,7 @@ Three focused skills for the pre-implementation half of an AI coding workflow: l
 - **`/extract`** — pull content out of every URL in a notes file (YouTube subtitles via yt-dlp, public Telegram via embed-page scrape, HTML via pandoc/curl). Replaces each URL with a local pointer, preserves originals, gitignores extracted content.
 - **`/clarify`** — turn a clean spec into an implementation-ready document: atomic tasks with Given/When/Then acceptance criteria, shell-runnable proof commands, contracts (FR-NNN with MUST/SHOULD/MAY), edge cases, risks. Cross-model consensus loop with Codex (optional) catches issues single-model self-review misses.
 
-Each skill follows the same template — `description` states triggers and tradeoffs (not algorithm), honest weakness section up front, ❌/✅ contrast pairs, "letter = spirit" canon, Cialdini-framed rules, senior-review self-check before output. Conventions are in `references/skill-template.md` and `references/principles.md`.
+Each skill follows the same template — `description` states triggers and tradeoffs (not algorithm), honest weakness section up front, ❌/✅ contrast pairs, "letter = spirit" canon, Cialdini-framed rules, senior-review self-check before output.
 
 ## Example
 

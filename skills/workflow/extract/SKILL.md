@@ -96,7 +96,10 @@ Scripts in `scripts/` are building blocks; the skill calls them via Bash:
    - Slug: `<type>-<short-id>` (e.g. `youtube-dQw4w9WgXcQ`, `telegram-channel-123`, `html-blog-example-com`). Max 50 chars.
    - Errors (404, private, fetch fail) — log to `<note>.extracted/.errors.log`, do not annotate the URL, keep going.
 4. **Annotate the note.** For each SUCCESSFULLY extracted URL — append `→ [<local-path>](<local-path>)` right after the URL in the note. Original URL preserved. Use the Edit tool, not Write. If a URL is already annotated (`→ [./...]` directly after) — skip unless `--force`.
-5. **Update .gitignore.** Add `*.extracted/` to `.gitignore` at git root (if git is initialized). Idempotent — use `gitignore_add` from `bin/common.sh`.
+5. **Update .gitignore.** Add `*.extracted/` to `.gitignore` at git root (if git is initialized). Idempotent — only append if the line isn't already there:
+   ```bash
+   grep -qxF '*.extracted/' .gitignore 2>/dev/null || echo '*.extracted/' >> .gitignore
+   ```
 6. **Final report + commit.** One line per URL (extracted / error / skipped) plus aggregate metrics. Auto-commit `extract: <N> URLs from <note>` (only processed files, not the whole branch).
 
 ## Outputs
