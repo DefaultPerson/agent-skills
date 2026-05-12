@@ -1,79 +1,96 @@
-# agent-workflow
+# agent-skills
 
-Spec-driven development pipeline for AI coding agents. Turn messy notes into shipped code — autonomously.
-
-Built on the [harness pattern](https://www.anthropic.com/engineering/harness-design-long-running-apps): state on disk, deterministic verification, graceful recovery from context limits.
+Three focused skills for the pre-implementation half of an AI coding workflow: pull content out of links, losslessly reorganize messy notes, decompose specs into atomic tasks with verifiable acceptance criteria. Pairs with [mattpocock/skills](https://github.com/mattpocock/skills) for the implementation side.
 
 ## The Flow
 
 ```
- ┌────────┐  cleanup  ┌────────┐  clarify  ┌────────┐  execute  ┌────────┐  verify
- │ notes  ├──────────>│  spec  ├──────────>│tasks+AC├──────────>│  code  ├─────────> PASS/FAIL
- │ ideas  │           │ sorted │    ▲      │proof   │           │commits │
- │ chat   │           │verified│    │      │[P]marks│           │per task│
- └────────┘           └────────┘ approval  └────────┘           └───┬────┘
-                                   gate               worktree      │
-                                                      agents     ◄──┘ fix loop
-                                                               (max 3 rounds)
+ ┌────────┐  extract  ┌────────────┐  cleanup  ┌──────────┐  clarify  ┌─────────┐    →   mattpocock:tdd
+ │ notes  ├──────────>│ notes with ├──────────>│  clean   ├──────────>│ atomic  │    →   Claude Code goal feature
+ │  with  │           │  offline   │           │ markdown │           │ tasks + │    →   manual implementation
+ │ links  │           │  content   │           │ document │           │ AC with │    →   claude -p for AC verify
+ └────────┘           └────────────┘           └──────────┘           │  proof  │
+                                                                     │commands │
+                                                                     └─────────┘
+                                                                          ▲
+                                                                          │
+                                                              Codex+Claude consensus
+                                                                (Phase 7.6 in clarify)
 ```
 
-All commands use the `workflow:` prefix:
+## Skills
 
-- **workflow:cleanup** — sort, rewrite, 3-level gap detection, 100% content preservation. Split into spec + references.
-- **workflow:clarify** — tasks with Given/When/Then AC, proof commands, [P]arallel markers, execution order. Approval gate.
-- **workflow:execute** — parallel worktree agents per [P] task. Each task = one commit. Auto-verify + fix loop (max 3).
-- **workflow:verify** — fresh context, zero builder narrative. Run every proof command, report PASS/FAIL/UNKNOWN.
-- **workflow:autoresearch** — autonomous optimization loop. One atomic change per iteration: commit → measure → keep or revert.
-- **workflow:ralph-loop** — autonomous execution across context limits. Stop hook blocks exit until completion promise.
-- **workflow:cancel-ralph** — abort active ralph loop.
+- **`/extract`** — pull content out of every URL in a notes file (YouTube subtitles via yt-dlp, public Telegram via tchan, HTML via pandoc/curl). Replaces each URL with a local pointer, preserves originals, gitignores extracted content.
+- **`/cleanup`** — losslessly reorganize a messy notes/plan/chat dump into a clean sectioned markdown file. Three-level gap detection (deterministic URL check + per-section semantic agents + fuzzy coverage net) proves nothing was lost. Multi-file input → multi-file output (per-source pipelines, not merged).
+- **`/clarify`** — turn a clean spec into an implementation-ready document: atomic tasks with Given/When/Then acceptance criteria, shell-runnable proof commands, contracts (FR-NNN with MUST/SHOULD/MAY), edge cases, risks. Cross-model consensus loop with Codex (optional) catches issues single-model self-review misses.
+
+Each skill follows the same template — `description` states triggers and tradeoffs (not algorithm), honest weakness section up front, ❌/✅ contrast pairs, "letter = spirit" canon, Cialdini-framed rules, senior-review self-check before output. Conventions are in `references/skill-template.md` and `references/principles.md`.
 
 ## Example
 
 ```bash
-/workflow:cleanup notes.md chat-export.md ideas.md
+# 1. Pull content out of every URL in the note (YouTube transcripts,
+#    Telegram posts, articles). Original note keeps the URLs; pointers
+#    to local copies appear next to each one.
+/extract research-notes.md
+
+# 2. Reorganize the chaos into a clean sectioned doc with proven
+#    coverage (nothing dropped, every URL preserved or explicitly errored).
+/cleanup research-notes.md
+
+# 3. Decompose into atomic tasks with verifiable AC. Phase 7.6 invokes
+#    Codex via codex:codex-rescue (if installed) for cross-model review,
+#    iterates up to 3 rounds until consensus.
+/clarify research-notes.md
+
+# 4. Hand the resulting spec to whichever builder you prefer:
+#    - mattpocock:tdd (test-first implementation, see Companion below)
+#    - Claude Code goal feature (measurable success criteria)
+#    - manual coding
+#    - claude -p in fresh context to verify AC after implementation
 ```
 
-Sort semantically, rewrite into clean markdown, 3-level gap detection — **zero content loss**.
+## Companion plugin: mattpocock/skills
+
+`agent-skills` deliberately doesn't ship implementation/verification skills — those exist in [mattpocock/skills](https://github.com/mattpocock/skills) and pair naturally with our spec output.
 
 ```bash
-/workflow:clarify spec.md
+/plugin install mattpocock/skills
 ```
 
-Decompose into atomic tasks with acceptance criteria. Approval gate — nothing runs without your OK.
+Recommended pairings:
 
-```bash
-/workflow:execute spec.md
-```
-
-Parallel worktree agents, commit per task, auto-verify. ralph-loop activates automatically for large specs.
-
-```bash
-/workflow:verify spec.md
-```
-
-Independent verification — fresh context, runs every proof command.
+- **`mattpocock:tdd`** — test-driven implementation using AC from `/clarify` output as the test surface.
+- **`mattpocock:grill-me`** — interview-style elicitation when `/clarify` Phase 2 questions aren't enough.
+- **`mattpocock:to-prd`** — alternative spec format when you want product-manager-style PRD instead of test-first AC.
+- **`mattpocock:caveman`** — token-saver for long sessions.
+- **`mattpocock:git-guardrails-claude-code`** — git operation safety rails.
 
 ## Installation
 
-### Claude Code
-
 ```bash
-/plugin marketplace add DefaultPerson/agent-workflow
-/plugin install agent-workflow@agent-workflow
+/plugin marketplace add DefaultPerson/agent-skills
+/plugin install agent-skills@agent-skills
 ```
 
-ralph-loop is included — long-running execution works out of the box.
-
-### Codex CLI
-
-```bash
-git clone https://github.com/DefaultPerson/agent-workflow.git
-cp -r agent-workflow/skills-codex/* ~/.codex/skills/
-```
+Optional: install [codex CLI](https://github.com/openai/codex) + the `codex` plugin to enable `/clarify`'s Phase 7.6 cross-model consensus loop. Without codex, `/clarify` falls back to single-model internal validation with a warning.
 
 ## Prerequisites
 
-Git, `gh` CLI (authenticated), Python 3.10+.
+- **Required:** Git, `bash`, `jq`, `python3`.
+- **`/extract` deps** (probed at runtime, install prompt if missing): `yt-dlp` (YouTube), `tchan` (Telegram), `pandoc` (HTML — optional, falls back to crude curl).
+- **`/clarify` Phase 7.6 optional:** `codex` CLI + `codex:codex-rescue` skill for cross-model consensus.
+
+## v2.0.0 breaking changes
+
+If migrating from v1.x: this release **removes** the orchestration skills.
+
+- **Skills removed:** `/execute`, `/verify`, `/autoresearch`, `/ralph-loop`, `/cancel-ralph`. Use `mattpocock:tdd` for implementation; use `claude -p` in fresh context for independent AC verification on a clarify-produced spec. `autoresearch` moved to a separate repository (see TODO when published).
+- **`/clarify` slimmed:** spec generation core preserved (AC format, proof commands, contracts), but execute-orchestration parts gone (`[P]` parallel markers, Stages, Execution Order section, dependency graphs for parallel workers, worker prompt templates). Output is now suitable for human/`tdd`/goal-feature consumption, NOT autonomous orchestration.
+- **`skills-codex/` and `.codex-plugin/` removed:** the remaining skills (`cleanup`, `clarify`, `extract`) are tool-agnostic at the Bash level. If you need a Codex CLI variant in the future, it'll be regenerated via a sync script.
+- **Hooks removed:** the `ralph-stop.py` Stop hook is gone with `ralph-loop`. Orphaned `.claude/ralph-loop.local.md` state files from prior versions are safe to delete: `rm -f .claude/ralph-loop.local.md`.
+
+If you were relying on autonomous spec→implementation execution, switch to `mattpocock:tdd` or wait for a v2.x add-on if community demand returns the feature.
 
 ## License
 

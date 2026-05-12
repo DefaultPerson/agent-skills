@@ -1,16 +1,16 @@
 {
-  "name": "agent-workflow",
+  "name": "agent-skills",
   "owner": {
     "name": "DefaultPerson"
   },
   "plugins": [
     {
-      "name": "agent-workflow",
+      "name": "agent-skills",
       "source": "./",
-      "description": "Spec-driven development pipeline: cleanup → clarify → execute → verify + autoresearch + ralph-loop",
-      "version": "1.1.0",
+      "description": "Notes cleanup + spec enrichment with verifiable AC + URL extraction (YouTube/Telegram/HTML). Companion to mattpocock/skills.",
+      "version": "2.0.0",
       "category": "development",
-      "keywords": ["workflow", "spec-driven", "skills", "ralph-loop", "autoresearch"]
+      "keywords": ["cleanup", "clarify", "spec", "extract", "notes", "youtube", "telegram"]
     }
   ]
 }
