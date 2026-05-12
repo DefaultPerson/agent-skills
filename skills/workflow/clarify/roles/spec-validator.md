@@ -1,8 +1,8 @@
 # Spec validator — internal single-model fallback
 
-Used in Phase 7.6 ONLY when codex is unavailable (no `codex:rescue` skill / no `codex` CLI on the machine). This is a fallback: one model reviewing its own output — weaker than cross-model consensus, but still better than nothing.
+Used in Phase 7.6 ONLY when codex is unavailable (no `codex:adversarial-review` skill from `openai/codex-plugin-cc`, no `codex` CLI, OR the spec isn't in a git repo so working-tree review can't run). This is a fallback: one model reviewing its own output — weaker than cross-model consensus, but still better than nothing.
 
-If codex is available → `roles/codex-reviewer.md` + `roles/claude-self-assessor.md` are used instead of this role.
+If codex is available and the spec is in git → `codex:adversarial-review` (driven by the focus brief in `roles/codex-reviewer.md`) + `roles/claude-self-assessor.md` are used instead of this role.
 
 ## Inputs
 

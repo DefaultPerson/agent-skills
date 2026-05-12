@@ -80,12 +80,12 @@ Turn a clean spec into an implementation-ready document with atomic tasks, verif
 
 ## Roles
 
-Step 2 (questioner pattern) and the Phase 7.6 consensus loop (with fallback validator) — all templates live in `roles/`:
+Step 2 (questioner pattern) and the Phase 7.6 consensus loop (with fallback validator) — templates live in `roles/`:
 
 - `roles/questioner.md` — format contract for AskUserQuestion in step 2 (not a subagent — a format spec)
-- `roles/spec-validator.md` — fallback internal validation, used inside Phase 7.6 when codex is unavailable
-- `roles/codex-reviewer.md` — Phase 7.6 Codex cross-model review (via `codex:rescue`)
-- `roles/claude-self-assessor.md` — Phase 7.6 Claude self-assessment in a fresh subprocess (`claude -p`)
+- `roles/codex-reviewer.md` — focus brief passed to `codex:adversarial-review` (from [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc)). NOT a full prompt — that command owns the adversarial role and JSON output schema.
+- `roles/claude-self-assessor.md` — Phase 7.6 Claude self-assessment in a fresh subprocess (`claude -p`), categorizes Codex findings as ACCEPT / REJECT_PETTY / NEEDS_USER
+- `roles/spec-validator.md` — fallback used inside Phase 7.6 when codex-plugin-cc is not installed
 
 Substitutions:
 
@@ -94,11 +94,13 @@ Substitutions:
 | `{spec_path}` | the spec file after step 6 (write) |
 | `{round}` | round counter in Phase 7.6 (1, 2, 3) |
 | `{spec_path}.bak` | original spec (pre-enrichment) for coverage check |
-| `{spec_path}.critique.<round-1>.md` | prior critique (for round > 1) |
+| `{spec_path}.critique.<round>.json` | Codex JSON output per round |
+| `{focus_brief}` | text content of `roles/codex-reviewer.md` (passed verbatim as USER_FOCUS) |
 
-Spawn codex review: `Agent(subagent_type="codex:rescue", prompt=substitute("roles/codex-reviewer.md", vars))`.
-Spawn claude self-assess: bash subprocess `claude -p` with prompt from `roles/claude-self-assessor.md`.
-Fallback validator (no codex): `Agent(subagent_type="Explore", prompt=substitute("roles/spec-validator.md", vars))`.
+Invocations:
+- **Codex adversarial review:** `Skill(skill="codex:adversarial-review", args="--wait --scope working-tree \"{focus_brief}\"")`. Output is structured JSON with findings (file, line_start, line_end, confidence, recommendation). Working-tree scope reads the uncommitted spec edit directly.
+- **Claude self-assessment:** Bash subprocess `claude -p` with the prompt from `roles/claude-self-assessor.md` plus the Codex JSON pasted in.
+- **Fallback validator (no codex):** `Agent(subagent_type="Explore", prompt=substitute("roles/spec-validator.md", vars))`.
 
 ## What the skill does (step by step)
 
@@ -118,64 +120,94 @@ The old "Execution Order" section (Stages, [P] markers, dependency graph for par
 
 After steps 6-7 (write enriched spec + verify-spec.py mechanical check), the convergence loop runs. Step 8 in the walkthrough is Phase 7.6.
 
+The loop drives `codex:adversarial-review` against the uncommitted spec edit, then has Claude (in a fresh `claude -p` subprocess) categorize the findings. Two independent passes per round — Codex finds, Claude triages.
+
 ```
 MAX_ROUNDS = consensus_rounds_flag (default 3, 0 disables)
 round = 0
+focus_brief = read("roles/codex-reviewer.md")  # the focus block, not the whole file
 
-if not has_codex():
-  log WARNING "codex not installed, falling back to single-model validation"
-  run roles/spec-validator.md (fallback)
+if not codex_plugin_installed:
+  log WARNING "codex-plugin-cc not installed; falling back to single-model validation"
+  result = Agent(subagent_type="Explore",
+                 prompt=substitute("roles/spec-validator.md",
+                                   {spec_path, spec_path_bak}))
   → CONSENSUS or NEEDS_FIX (single round only)
   goto Step 9 (approval gate)
+
+# Ensure spec is in working tree so adversarial-review can see it.
+# (Step 6 already wrote <spec>; do NOT commit yet — uncommitted edit is
+# exactly what working-tree scope is for.)
 
 while round < MAX_ROUNDS:
   round += 1
 
-  # Codex review
-  critique = Agent(subagent_type="codex:rescue",
-                   prompt=substitute("roles/codex-reviewer.md",
-                                     {spec_path, round}))
-  save → <spec>.critique.<round>.md
+  # 1. Codex adversarial review via Claude Code skill invocation
+  findings_json = Skill(
+    skill="codex:adversarial-review",
+    args=f"--wait --scope working-tree \"{focus_brief}\""
+  )
+  save → <spec>.critique.<round>.json
 
-  # Claude self-assessment in a fresh subprocess
-  assessment = bash: claude -p < substitute("roles/claude-self-assessor.md",
-                                            {spec_path, round})
+  # 2. Claude self-assessment in a fresh subprocess
+  assessment = bash: claude -p < (
+    read("roles/claude-self-assessor.md")
+    + "\n\nSpec file: " + spec_path
+    + "\n\nCodex findings:\n" + findings_json
+  )
 
-  # Exit?
-  if critique.verdict == PASS and assessment.verdict == AGREE_PASS:
+  # 3. Exit on consensus
+  if findings_json.summary == "approve" and assessment.verdict == AGREE_PASS:
     → CONSENSUS, exit loop
 
-  # Process issues
-  for each issue in critique.issues:
-    cat = assessment.categorization[issue.id]
-    if cat == ACCEPT: apply suggestion to spec
+  # 4. Process findings via assessment categorization
+  for each finding in findings_json.findings:
+    cat = assessment.categorization[finding.id]
+    if cat == ACCEPT: apply finding.recommendation to spec
     elif cat == REJECT_PETTY: log to <spec>.critique.<round>.rejected.md
     elif cat == NEEDS_USER: queue for AskUserQuestion
 
-  if queue not empty:
-    AskUserQuestion with the issues
+  if NEEDS_USER queue not empty:
+    AskUserQuestion with the issues + both views
     apply user decisions
 
-  # Oscillation detection
-  if hash(critique.issues) == hash_round_minus_2:
+  # 5. Oscillation detection
+  if hash(findings_json.findings) == hash_round_minus_2:
     → ESCALATE to user: "the models are stuck — your call"
     break
 
-if round == MAX_ROUNDS and no CONSENSUS:
+if round == MAX_ROUNDS and not CONSENSUS:
   ESCALATE to user: "(A) approve as-is, (B) abort, (C) one more round"
 ```
 
 Failure modes:
-- **Codex unavailable** → fallback to `roles/spec-validator.md` (single-model), workflow continues.
-- **Models gang up on user intent** → `roles/codex-reviewer.md` explicitly forbids proposing removal of unusual requirements (surface as NEEDS_USER instead). `roles/claude-self-assessor.md` mirrors the rule.
-- **Petty disagreements** → REJECT_PETTY category, logged to rejected.md with reasoning, not applied.
+- **codex-plugin-cc not installed** → fallback to `roles/spec-validator.md` (single-model), workflow continues with a warning.
+- **Spec not in a git repository** → `codex:adversarial-review --scope working-tree` requires git. If the spec lives outside any repo, also fall back to spec-validator.
+- **Models gang up on user intent** → `roles/codex-reviewer.md` focus brief explicitly forbids proposing removal of unusual requirements. `roles/claude-self-assessor.md` mirrors the rule when categorizing.
+- **Petty disagreements** → Codex shouldn't emit them (its `finding_bar` excludes style). If any leak through → REJECT_PETTY category, logged with reasoning, not applied.
 - **Oscillation** → hash comparison between rounds N and N-2, escalation.
+
+Output schema reminder (from codex-plugin-cc's adversarial-review prompt):
+```json
+{
+  "summary": "needs-attention | approve",
+  "findings": [
+    {
+      "file": "<spec.md path>",
+      "line_start": <int>,
+      "line_end": <int>,
+      "confidence": <0..1>,
+      "recommendation": "<concrete change>"
+    }
+  ]
+}
+```
 
 ## Outputs
 
 - `<spec>.bak` — original before enrichment
 - `<spec>` — overwritten with enriched version
-- `<spec>.critique.1.md`, `<spec>.critique.2.md`, ... — Codex critiques per round (if the consensus loop ran)
+- `<spec>.critique.1.json`, `<spec>.critique.2.json`, ... — Codex adversarial-review findings per round (if the consensus loop ran)
 - `<spec>.critique.<round>.rejected.md` — petty-issue rejections with reasoning (if any)
 
 Git: `pre-clarify: <name>` (snapshot before) and `clarify: enrich <name>` (after step 6).
@@ -189,7 +221,7 @@ Git: `pre-clarify: <name>` (snapshot before) and `clarify: enrich <name>` (after
   - manual implementation
   - independent `claude -p` verify for AC checks after implementation
 - **Does not call** other skills automatically. After step 9 (approval): `Spec approved. /clear before continuing.` — no recommendation.
-- **Cross-model dependency:** Phase 7.6 uses `codex:rescue` if installed. Without it — graceful fallback.
+- **Cross-model dependency:** Phase 7.6 uses `codex:adversarial-review` from [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) if installed and the spec is in a git repo. Without it — graceful fallback to `roles/spec-validator.md`.
 
 ## Rules
 
