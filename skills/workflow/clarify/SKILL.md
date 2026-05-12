@@ -24,9 +24,9 @@ allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, AskUserQuestion, Web
 
 Turn a clean spec into an implementation-ready document with atomic tasks, verifiable acceptance criteria, contracts, edge cases, and risks.
 
-> **Буква = дух.** Если правило мешает достичь цели, ради которой оно
-> написано — правило ошибочно, а не цель. Не ищи лазейку в формулировке —
-> спроси, что правило защищает, и защищай это.
+> **Letter = spirit.** If a rule blocks you from reaching the goal it was
+> written for, the rule is wrong, not the goal. Don't look for a wording
+> loophole — ask what the rule is protecting, and protect that.
 
 ## Usage
 
@@ -34,89 +34,89 @@ Turn a clean spec into an implementation-ready document with atomic tasks, verif
 /clarify <spec.md> [--consensus-rounds N]
 ```
 
-`--consensus-rounds` default 3. Set to 0 to skip cross-model consensus loop (Phase 7.6) — only internal validation runs.
+`--consensus-rounds` defaults to 3. Set it to 0 to skip the cross-model consensus loop (Phase 7.6) — only internal validation runs.
 
-## Слабые стороны и когда НЕ использовать
+## Weaknesses and when NOT to use
 
-- **Медленный и тщательный — оверкилл для часовых задач.** Декомпозиция + AC + edge cases + 3 раунда консенсуса (если codex доступен) занимают 10-15 минут. Если задача меньше — пиши AC от руки.
-- **Не работает с сырыми chat-экспортами или unstructured notes.** Spec на входе должен быть уже sectioned по `## ` (после `/cleanup`). Если нет — abort.
-- **Не подходит для product-style PRD.** Скилл force'ит test-first AC с proof-командами; для product-management PRD используй `mattpocock:to-prd` (freeform success metrics).
-- **Phase 7.6 consensus loop требует codex CLI.** Без него — fallback на internal validation (одна модель проверяет свой output, слабее).
-- **Не для autonomous orchestration.** В output'е нет `[P]` markers, Stages, dependency graphs — execute pipeline удалён из этого репо в v2.0. Output под mattpocock:tdd или ручную работу.
+- **Slow and thorough — overkill for hour-long tasks.** Decomposition + AC + edge cases + 3 consensus rounds (if codex is available) take 10-15 minutes. For smaller tasks, write the AC by hand.
+- **Does not work on raw chat exports or unstructured notes.** The input spec must already be sectioned with `## ` (after `/cleanup`). Otherwise — abort.
+- **Not suited for product-style PRDs.** This skill forces test-first AC with proof commands; for product-management PRDs use `mattpocock:to-prd` (freeform success metrics).
+- **Phase 7.6 consensus loop requires the codex CLI.** Without it — fallback to internal validation (a single model reviewing its own output, weaker).
+- **Not for autonomous orchestration.** The output has no `[P]` markers, Stages, or dependency graphs — the execute pipeline was removed from this repo in v2.0. Output is for `mattpocock:tdd` or manual work.
 
-## Как делать неправильно vs правильно
+## How to do it wrong vs right
 
-### AC формат
+### AC format
 
-❌ **Плохо:** `AC-1.1: API returns correct response`
-- "Correct" — кто решит?
-- Нет proof-команды
-- Boolean (works / doesn't) — нет UNKNOWN
+❌ **Wrong:** `AC-1.1: API returns correct response`
+- "Correct" — who decides?
+- No proof command
+- Boolean (works / doesn't) — no UNKNOWN
 
-✅ **Хорошо:** `AC-1.1: GET /api/users returns 200, JSON with {id,name,email}, <200ms`
-- Конкретные числа и поля
+✅ **Right:** `AC-1.1: GET /api/users returns 200, JSON with {id,name,email}, <200ms`
+- Concrete numbers and fields
 - Proof: `curl -w '%{time_total}' localhost:8080/api/users | jq '.[].id'`
-- Tristate: PASS / FAIL / UNKNOWN (если сервер не запущен)
+- Tristate: PASS / FAIL / UNKNOWN (when the server isn't running)
 
 ### Task scope
 
-❌ **Плохо:** `TASK-1: Implement authentication system`
-- Затрагивает много файлов
-- Множественные цели смешаны
-- Невозможно verify одной командой
+❌ **Wrong:** `TASK-1: Implement authentication system`
+- Touches many files
+- Multiple purposes mixed
+- Cannot be verified with a single command
 
-✅ **Хорошо:** `TASK-1: Create User model в src/models/user.py с полями email/password`
-- 1 файл, чёткие границы
-- Atomic — одна testable деливерабл
-- AC: `python -c "from src.models.user import User; User(email='a@b', password='x')"` без error'ов
+✅ **Right:** `TASK-1: Create User model in src/models/user.py with email/password fields`
+- 1 file, clear boundaries
+- Atomic — one testable deliverable
+- AC: `python -c "from src.models.user import User; User(email='a@b', password='x')"` runs without errors
 
 ### Cross-model consensus disagreement
 
-❌ **Плохо:** Codex выдал NEEDS_IMPROVEMENT с issue "requirement X выглядит unusual, предлагаю удалить". Применяю — удаляю.
-- Пользователь поставил requirement намеренно.
-- Удалением я "помог себе быстрее", а пользователю — заминусовал его intent.
+❌ **Wrong:** Codex returns NEEDS_IMPROVEMENT with an issue "requirement X looks unusual, suggest removing it". I apply it — I remove it.
+- The user added the requirement on purpose.
+- Removing it "helped me faster" but stomped the user's intent.
 
-✅ **Хорошо:** Issue type = NEEDS_USER (либо Codex его сам так пометил, либо Claude self-assessor reclassified). AskUserQuestion с обоими взглядами. Пользователь решает.
+✅ **Right:** Issue type = NEEDS_USER (either Codex flagged it that way itself, or Claude self-assessor reclassified). AskUserQuestion with both views. The user decides.
 
-## Роли
+## Roles
 
-Step 2 (questioner pattern) и Phase 7.6 consensus loop (с fallback validator) — все шаблоны в `roles/`:
+Step 2 (questioner pattern) and the Phase 7.6 consensus loop (with fallback validator) — all templates live in `roles/`:
 
-- `roles/questioner.md` — format-контракт для AskUserQuestion в Step 2 (не subagent — format spec)
-- `roles/spec-validator.md` — fallback internal validation, используется в Phase 7.6 если codex недоступен
-- `roles/codex-reviewer.md` — Phase 7.6 Codex cross-model review (через `codex:rescue`)
-- `roles/claude-self-assessor.md` — Phase 7.6 Claude self-assess fresh subprocess (`claude -p`)
+- `roles/questioner.md` — format contract for AskUserQuestion in step 2 (not a subagent — a format spec)
+- `roles/spec-validator.md` — fallback internal validation, used inside Phase 7.6 when codex is unavailable
+- `roles/codex-reviewer.md` — Phase 7.6 Codex cross-model review (via `codex:rescue`)
+- `roles/claude-self-assessor.md` — Phase 7.6 Claude self-assessment in a fresh subprocess (`claude -p`)
 
-Подстановки:
+Substitutions:
 
-| Переменная | Источник |
+| Variable | Source |
 |---|---|
-| `{spec_path}` | spec-файл после Phase 7 write |
-| `{round}` | счётчик раундов в Phase 7.6 (1, 2, 3) |
-| `{spec_path}.bak` | original spec (pre-enrichment) для coverage check |
-| `{spec_path}.critique.<round-1>.md` | prior critique (для round > 1) |
+| `{spec_path}` | the spec file after step 6 (write) |
+| `{round}` | round counter in Phase 7.6 (1, 2, 3) |
+| `{spec_path}.bak` | original spec (pre-enrichment) for coverage check |
+| `{spec_path}.critique.<round-1>.md` | prior critique (for round > 1) |
 
-Спавн codex review: `Agent(subagent_type="codex:rescue", prompt=substitute("roles/codex-reviewer.md", vars))`.
-Спавн claude self-assess: bash subprocess `claude -p` с prompt из `roles/claude-self-assessor.md`.
-Fallback validator (без codex): `Agent(subagent_type="Explore", prompt=substitute("roles/spec-validator.md", vars))`.
+Spawn codex review: `Agent(subagent_type="codex:rescue", prompt=substitute("roles/codex-reviewer.md", vars))`.
+Spawn claude self-assess: bash subprocess `claude -p` with prompt from `roles/claude-self-assessor.md`.
+Fallback validator (no codex): `Agent(subagent_type="Explore", prompt=substitute("roles/spec-validator.md", vars))`.
 
-## Что делает скилл (по шагам)
+## What the skill does (step by step)
 
-1. **Прочесть и проанализировать spec.** Validate (markdown, есть `## ` headers, нет cleanup markers `[MISSING]`/etc), classify тип (product / technical / small), scan codebase если есть, отметить `[NEEDS CLARIFICATION]` markers.
-2. **Спросить пользователя что неясно** (hard gate). Max 5 вопросов через AskUserQuestion — формат в `roles/questioner.md`. Если spec уже clear — skip.
-3. **Декомпозировать на atomic tasks.** Формат адаптируется к типу — детали в `references/task-format.md`. Главное: каждый task — 1-3 файла, AC с Given/When/Then + Proof shell-команда (НИКАКИХ `[P]` markers и Stages — execute удалён).
-4. **Определить contracts** (FR-NNN format, MUST/SHOULD/MAY). Skip если spec small или single-component. Детали в `references/contracts.md`.
-5. **Self-review checklist.** Placeholder scan, internal consistency, scope check, ambiguity check. Фиксы — loop назад на нужный phase.
-6. **Записать enriched spec.** Backup оригинала (`<spec>.bak`), записать enriched в исходный путь. Структура шаблонов: см. `references/task-format.md`.
+1. **Read and analyze the spec.** Validate (markdown, has `## ` headers, no cleanup markers `[MISSING]`/etc), classify type (product / technical / small), scan the codebase if present, flag `[NEEDS CLARIFICATION]` items.
+2. **Ask the user what's unclear** (hard gate). Max 5 questions via AskUserQuestion — format in `roles/questioner.md`. If the spec is already clear — skip.
+3. **Decompose into atomic tasks.** Format adapts to type — details in `references/task-format.md`. Main rule: each task touches 1-3 files, AC is Given/When/Then + a shell Proof command (NO `[P]` markers or Stages — execute is gone).
+4. **Define contracts** (FR-NNN format, MUST/SHOULD/MAY). Skip if the spec is small or single-component. Details in `references/contracts.md`.
+5. **Self-review checklist.** Placeholder scan, internal consistency, scope check, ambiguity check. Fixes — loop back to the relevant phase.
+6. **Write the enriched spec.** Back up the original (`<spec>.bak`), write enriched into the original path. Template structures: see `references/task-format.md`.
 7. **Mechanical validation.** `python3 scripts/verify-spec.py <spec>`. FAIL → fix and re-run.
-8. **Cross-model consensus loop (Phase 7.6).** Codex review + Claude self-assess, итеративно до CONSENSUS или max rounds. Детали — следующая секция. Можно skip через `--consensus-rounds 0`.
-9. **Approval gate.** Сводный отчёт + AskUserQuestion (Approve / Modify / Questions). После approval: `"Spec approved. /clear before continuing."` — без рекомендаций downstream-скиллов.
+8. **Cross-model consensus loop (Phase 7.6).** Codex review + Claude self-assess, iterate until CONSENSUS or max rounds. Details — next section. Can be skipped with `--consensus-rounds 0`.
+9. **Approval gate.** Summary report + AskUserQuestion (Approve / Modify / Questions). After approval: `"Spec approved. /clear before continuing."` — no downstream recommendation.
 
-Старая «Execution Order» секция (Stages, [P] markers, dependency graph для parallel spawn) — УДАЛЕНА в v2.0. Была для execute orchestration, которого больше нет.
+The old "Execution Order" section (Stages, [P] markers, dependency graph for parallel spawn) is GONE in v2.0. It existed for the execute orchestration, which no longer ships.
 
 ## Phase 7.6 — Cross-model consensus loop
 
-После Step 6-7 (write enriched spec + verify-spec.py mechanical check) запускается convergence loop. Step 8 в общем walkthrough — это и есть Phase 7.6.
+After steps 6-7 (write enriched spec + verify-spec.py mechanical check), the convergence loop runs. Step 8 in the walkthrough is Phase 7.6.
 
 ```
 MAX_ROUNDS = consensus_rounds_flag (default 3, 0 disables)
@@ -137,7 +137,7 @@ while round < MAX_ROUNDS:
                                      {spec_path, round}))
   save → <spec>.critique.<round>.md
 
-  # Claude self-assessment в fresh subprocess
+  # Claude self-assessment in a fresh subprocess
   assessment = bash: claude -p < substitute("roles/claude-self-assessor.md",
                                             {spec_path, round})
 
@@ -150,67 +150,67 @@ while round < MAX_ROUNDS:
     cat = assessment.categorization[issue.id]
     if cat == ACCEPT: apply suggestion to spec
     elif cat == REJECT_PETTY: log to <spec>.critique.<round>.rejected.md
-    elif cat == NEEDS_USER: queue для AskUserQuestion
+    elif cat == NEEDS_USER: queue for AskUserQuestion
 
   if queue not empty:
-    AskUserQuestion с issues
+    AskUserQuestion with the issues
     apply user decisions
 
   # Oscillation detection
   if hash(critique.issues) == hash_round_minus_2:
-    → ESCALATE user: "модели зациклились, твой call"
+    → ESCALATE to user: "the models are stuck — your call"
     break
 
 if round == MAX_ROUNDS and no CONSENSUS:
-  ESCALATE user: "(A) approve as-is, (B) abort, (C) one more round"
+  ESCALATE to user: "(A) approve as-is, (B) abort, (C) one more round"
 ```
 
 Failure modes:
-- **Codex unavailable** → fallback к `roles/spec-validator.md` (single-model), workflow продолжает.
-- **Models gang up on user intent** → `roles/codex-reviewer.md` явно запрещает proposing removal of unusual requirements (surface as NEEDS_USER instead). `roles/claude-self-assessor.md` дублирует правило.
-- **Petty disagreements** → REJECT_PETTY категория, logged в rejected.md с reasoning, не применяется.
-- **Oscillation** → hash comparison rounds N and N-2, escalation.
+- **Codex unavailable** → fallback to `roles/spec-validator.md` (single-model), workflow continues.
+- **Models gang up on user intent** → `roles/codex-reviewer.md` explicitly forbids proposing removal of unusual requirements (surface as NEEDS_USER instead). `roles/claude-self-assessor.md` mirrors the rule.
+- **Petty disagreements** → REJECT_PETTY category, logged to rejected.md with reasoning, not applied.
+- **Oscillation** → hash comparison between rounds N and N-2, escalation.
 
 ## Outputs
 
-- `<spec>.bak` — оригинал до enrichment
-- `<spec>` — перезаписан enriched-версией
-- `<spec>.critique.1.md`, `<spec>.critique.2.md`, ... — Codex critiques per round (если consensus loop запускался)
-- `<spec>.critique.<round>.rejected.md` — петля отказа от petty issues с reasoning (если были)
+- `<spec>.bak` — original before enrichment
+- `<spec>` — overwritten with enriched version
+- `<spec>.critique.1.md`, `<spec>.critique.2.md`, ... — Codex critiques per round (if the consensus loop ran)
+- `<spec>.critique.<round>.rejected.md` — petty-issue rejections with reasoning (if any)
 
-Git: `pre-clarify: <name>` (snapshot before) и `clarify: enrich <name>` (после Phase 7).
+Git: `pre-clarify: <name>` (snapshot before) and `clarify: enrich <name>` (after step 6).
 
-## Связи с другими скиллами
+## Connections to other skills
 
-- **Вход:** обычно после `/cleanup` (sectioned markdown без `[MISSING]` markers). Может быть и manual-составленный spec, если он structurally валиден.
-- **Выход:** enriched spec с AC + proof commands, пригодный для:
-  - mattpocock:tdd (тест-first implementation)
-  - Claude Code goal feature (для измеримых критериев)
-  - ручной реализации
-  - independent `claude -p` verify для AC проверки после implementation
-- **Не вызывает** другие скиллы автоматически. После Step 9 (approval): `Spec approved. /clear before continuing.` — без рекомендаций.
-- **Cross-model dependency**: Phase 7.6 использует `codex:rescue` если установлен. Без него — graceful fallback.
+- **Input:** typically after `/cleanup` (sectioned markdown without `[MISSING]` markers). A manually written spec is also fine if it's structurally valid.
+- **Output:** enriched spec with AC + proof commands, suitable for:
+  - mattpocock:tdd (test-first implementation)
+  - Claude Code goal feature (for measurable success criteria)
+  - manual implementation
+  - independent `claude -p` verify for AC checks after implementation
+- **Does not call** other skills automatically. After step 9 (approval): `Spec approved. /clear before continuing.` — no recommendation.
+- **Cross-model dependency:** Phase 7.6 uses `codex:rescue` if installed. Without it — graceful fallback.
 
-## Правила
+## Rules
 
-### Общность
-Spec — shared artifact. Downstream работа (mattpocock:tdd, goal feature, manual builder) принимает решения по нему. Если ты пропустил placeholder, vague AC, или contradictory FR — следующий шаг работает с дырявой картой. Не "помог быстрее" — сломал общую работу.
+### Commonality
+The spec is a shared artifact. Downstream work (mattpocock:tdd, goal feature, manual builder) makes decisions from it. If you let a placeholder through, leave a vague AC, or fail to resolve a contradictory FR — the next step works from a holey map. Not "helping faster" — breaking the shared work.
 
-### Прежнее обязательство
-В шаге 5 (self-review) ты обязался прогнать placeholder scan + consistency + ambiguity check. В шаге 7 — `verify-spec.py`. В шаге 8 — consensus loop (или fallback). Пропуск любого шага = withdrawing основание для финального verdict'а пользователя.
+### Prior commitment
+In step 5 (self-review) you committed to running placeholder scan + consistency + ambiguity check. In step 7 — `verify-spec.py`. In step 8 — the consensus loop (or fallback). Skipping any step withdraws the basis for the final verdict the user is going to act on.
 
-### Социальное доказательство (cross-model rationale)
-Phase 7.6 существует, потому что single-model self-review слабее. По данным консенсус-исследований (AltimateAI/claude-consensus, ARIS — adversarial cross-model review), независимая вторая модель ловит issues, которые первая bias-ит мимо. Если ты "пропускаешь" Phase 7.6 при наличии codex — теряется единственное реальное основание доверять spec'у больше, чем "Claude себя похвалил".
+### Social proof (cross-model rationale)
+Phase 7.6 exists because single-model self-review is weaker. Per consensus research (AltimateAI/claude-consensus, ARIS — adversarial cross-model review), an independent second model catches issues the first biases past. If you "skip" Phase 7.6 when codex is present, you remove the only real basis to trust the spec beyond "Claude approved its own output".
 
-## Самопроверка перед выдачей результата
+## Self-check before delivering the result
 
-Прошла бы эта спека ревью у синьора-инженера, которому по ней строить систему? Конкретно:
+Would this spec pass review by a senior engineer who has to build the system from it? Concretely:
 
-- Каждый AC имеет конкретную proof-команду (не "это работает", не "manual check")?
-- Нет placeholder'ов (`TBD`, `...`, `[NEEDS CLARIFICATION]`, `<insert here>`)?
-- Каждая задача atomic — 1-3 файла, single purpose, выполнима независимым воркером без вопросов к автору?
-- Phase 7.6 прошёл (или явно skipped с reasoning)?
-- Coverage: каждый item из Overview имеет хотя бы один task? Каждый task tracks обратно в Overview / FR?
-- Backup `<spec>.bak` существует — пользователь может откатиться?
+- Does every AC have a concrete proof command (not "it works", not "manual check")?
+- No placeholders (`TBD`, `...`, `[NEEDS CLARIFICATION]`, `<insert here>`)?
+- Is every task atomic — 1-3 files, single purpose, executable by an independent worker without questions to the author?
+- Did Phase 7.6 pass (or was it explicitly skipped with reasoning)?
+- Coverage: does every Overview item have at least one task? Does every task track back to Overview / FR?
+- Backup `<spec>.bak` exists — the user can roll back?
 
-Если "нет" хоть на один пункт — переделай, не отдавай.
+If "no" on any item — redo, don't ship.

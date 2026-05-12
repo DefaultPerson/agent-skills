@@ -6,21 +6,21 @@ Shared across every SKILL.md in agent-skills. Read once, internalize, don't re-p
 
 Every SKILL.md embeds this block right after the H1:
 
-> **Буква = дух.** Если правило мешает достичь цели, ради которой оно
-> написано — правило ошибочно, а не цель. Не ищи лазейку в формулировке —
-> спроси, что правило защищает, и защищай это.
+> **Letter = spirit.** If a rule blocks you from reaching the goal it was
+> written for, the rule is wrong, not the goal. Don't look for a wording
+> loophole — ask what the rule is protecting, and protect that.
 
 ### Why this matters (anti-example)
 
-**Rule:** «не редактируй файлы вне поля Files задачи».
+**Rule:** "do not edit files outside the task's Files field".
 
-**Letter loophole:** «Я не редактирую — я создаю новый файл, его в Files нет, значит запрет не действует».
+**Letter loophole:** "I'm not editing — I'm creating a new file; it's not in Files, so the ban doesn't apply".
 
-**Spirit of the rule:** задача атомарна; изоляция воркеров обеспечивается тем, что каждый трогает заранее объявленные файлы. Создание нового файла, который другие задачи могут начать читать — нарушение изоляции, даже если буква запрета его не описывает.
+**Spirit of the rule:** the task is atomic; worker isolation is guaranteed by each one touching pre-declared files. Creating a new file that other tasks may start reading breaks isolation, even if the literal ban doesn't describe it.
 
-**Correct response:** остановиться → «что правило защищает?» → «атомарность задачи и независимость воркеров» → «создание файла вне Files ломает это?» → «да» → не делать.
+**Correct response:** stop → "what is the rule protecting?" → "task atomicity and worker independence" → "does creating a file outside Files break that?" → "yes" → don't do it.
 
-**Wrong response:** «формально нарушения нет, делаю».
+**Wrong response:** "no formal violation, going ahead".
 
 ## Contrast pairs ❌ → ✅
 
@@ -70,15 +70,15 @@ Mapping by skill type:
 Last gate before the skill commits output. Three variants:
 
 **Code-producing:**
-> Прошёл бы этот код ревью у синьора-инженера? Конкретно: нет заглушек/`TODO`/`console.log`/`print(`; использованы существующие паттерны из codebase (grep сделан); тесты/AC прогнаны на текущем состоянии файлов. Если "нет" — переделай, не отдавай.
+> Would this code pass review by a senior engineer? Concretely: no stubs / `TODO` / `console.log` / `print(`; existing patterns from the codebase reused (grep done); tests / AC run against current file state. If "no" — redo, don't ship.
 
 **Spec/note-producing:**
-> Прошёл бы этот документ ревью у синьора-инженера, которому по нему строить систему? Конкретно: каждый AC имеет proof-команду (не «это работает»); нет `TBD`/`...`/placeholder'ов; каждая задача выполнима независимым воркером без вопросов. Если "нет" — переделай.
+> Would this document pass review by a senior engineer who has to build the system from it? Concretely: every AC has a proof command (not "it works"); no `TBD` / `...` / placeholders; every task is executable by an independent worker without questions. If "no" — redo.
 
 **Read-only / side-effect:**
-> Прошёл бы этот результат ревью у синьора? Конкретно: проверка-1; проверка-2; проверка-3. Если "нет" — переделай, не отдавай.
+> Would this result pass review by a senior? Concretely: check 1; check 2; check 3. If "no" — redo, don't ship.
 
-Placement: last section in SKILL.md, after Правила. Reasoning — it's the last thing the model reads in its execution mental model, so it catches the commit-time omission rather than the planning-time omission. See `references/skill-template.md` for the canonical section order.
+Placement: last section in SKILL.md, after Rules. Reasoning — it's the last thing the model reads in its execution mental model, so it catches the commit-time omission rather than the planning-time omission. See `references/skill-template.md` for the canonical section order.
 
 ## Role files vs SKILL.md
 

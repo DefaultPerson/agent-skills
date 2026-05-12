@@ -22,9 +22,9 @@ allowed-tools: [Bash, Read, Edit, Glob, Grep, AskUserQuestion]
 
 Pull content out of every URL in a notes file (YouTube subtitles, Telegram post text, HTML articles) into a sibling `<note>.extracted/` directory, replacing each URL with a local pointer.
 
-> **Буква = дух.** Если правило мешает достичь цели, ради которой оно
-> написано — правило ошибочно, а не цель. Не ищи лазейку в формулировке —
-> спроси, что правило защищает, и защищай это.
+> **Letter = spirit.** If a rule blocks you from reaching the goal it was
+> written for, the rule is wrong, not the goal. Don't look for a wording
+> loophole — ask what the rule is protecting, and protect that.
 
 ## Usage
 
@@ -34,114 +34,114 @@ Pull content out of every URL in a notes file (YouTube subtitles, Telegram post 
 
 `--force` re-processes URLs even if they're already annotated (default: skip already-annotated).
 
-## Слабые стороны и когда НЕ использовать
+## Weaknesses and when NOT to use
 
-- **Не работает с private/auth resources.** Private Telegram channels, paywalled articles, logged-in-only pages — out of scope. Те URL вернут error в final report.
-- **Зависит от внешних tools (yt-dlp, pandoc).** Если они не установлены, скилл предложит install через AskUserQuestion. Никогда не auto-install без OK. Если пользователь отказывается — соответствующие URL получают error. (Telegram embed-scrape работает только через `curl` — он почти всегда есть.)
-- **Излишен для 1-2 URL'ов.** Copy-paste быстрее, чем pipeline. Используй только если 3+ URL.
-- **Длинные YouTube видео (>2h, ~30k слов).** Extract пройдёт, но downstream работа (cleanup) может задохнуться от объёма. Pre-trim'ить вручную если нужно.
-- **JS-heavy SPA сайты.** `extract-html.sh` использует curl — JS не выполняется. Получишь скелет страницы без контента. Используй для blog posts, articles, docs, НЕ для interactive web apps.
+- **Does not work with private/auth resources.** Private Telegram channels, paywalled articles, logged-in-only pages — out of scope. Those URLs return an error in the final report.
+- **Depends on external tools (yt-dlp, pandoc).** If they're not installed, the skill prompts the user to install via AskUserQuestion. Never auto-installs without explicit OK. If the user declines — the matching URLs get an error. (Telegram embed-scrape needs only `curl`, which is almost always present.)
+- **Overkill for 1-2 URLs.** Copy-paste is faster than the pipeline. Use it only with 3+ URLs.
+- **Long YouTube videos (>2h, ~30k words).** Extract will succeed, but downstream work (cleanup) may choke on the volume. Pre-trim manually if needed.
+- **JS-heavy SPA sites.** `extract-html.sh` uses curl — JS is not executed. You'll get the page skeleton without content. Use it for blog posts, articles, docs, NOT for interactive web apps.
 
-## Как делать неправильно vs правильно
+## How to do it wrong vs right
 
 ### Dependency management
 
-❌ **Плохо:** yt-dlp missing → автоматически `pip install --user yt-dlp` без спроса.
-- User может не хотеть Python user-site packages.
-- User может быть на shared system, где pip нельзя.
-- Скилл превратился в installer.
+❌ **Wrong:** yt-dlp missing → automatically `pip install --user yt-dlp` without asking.
+- User might not want Python user-site packages.
+- User might be on a shared system where pip is restricted.
+- The skill turned itself into an installer.
 
-✅ **Хорошо:** Detect missing → AskUserQuestion: (1) "I'll install yt-dlp", (2) "Skip YouTube URLs", (3) "Abort". User-explicit only.
+✅ **Right:** Detect missing → AskUserQuestion: (1) "I'll install yt-dlp", (2) "Skip YouTube URLs", (3) "Abort". User-explicit only.
 
 ### URL annotation
 
-❌ **Плохо:** Replace URL в note полностью: `[YouTube видео](./extracted/youtube-abc/subtitles.en.txt)` — original URL потерян.
-- Auditability: не понять, откуда контент.
-- Re-extract невозможен без оригинала.
+❌ **Wrong:** Replace the URL in the note entirely: `[YouTube video](./extracted/youtube-abc/subtitles.en.txt)` — original URL is lost.
+- Auditability: no way to tell where the content came from.
+- Re-extract is impossible without the original.
 
-✅ **Хорошо:** URL preserved, рядом appended local pointer:
+✅ **Right:** URL preserved, local pointer appended next to it:
 ```
-Смотри https://youtube.com/watch?v=abc → [./note.extracted/youtube-abc/subtitles.en.txt](./note.extracted/youtube-abc/subtitles.en.txt)
+See https://youtube.com/watch?v=abc → [./note.extracted/youtube-abc/subtitles.en.txt](./note.extracted/youtube-abc/subtitles.en.txt)
 ```
 
 ### Multi-URL note
 
-❌ **Плохо:** Note содержит 10 URL — обработал 7, на 3 упал — отчитал "extract done" без error mentions.
-- Пользователь не знает про 3 broken URL.
-- Downstream работает с дырявой картой.
+❌ **Wrong:** Note has 10 URLs — processed 7, 3 failed — report "extract done" without mentioning the errors.
+- The user doesn't know about the 3 broken URLs.
+- Downstream works from a holey map.
 
-✅ **Хорошо:** Final report enumerates: `7 extracted, 3 errors (with reason per URL)`. Original note annotates только successful ones. Error URL'ы остаются без аннотации — пользователь решает, переобработать или забыть.
+✅ **Right:** Final report enumerates: `7 extracted, 3 errors (with reason per URL)`. The note only annotates successful ones. Errored URLs are left un-annotated — the user decides whether to retry or accept the gap.
 
-## Роли
+## Roles
 
-`roles/interactive-prompt.md` — format для AskUserQuestion при обработке `other`-типа URL (не YouTube, не Telegram). Substitution: `{url_short}` (первые 60 chars URL).
+`roles/interactive-prompt.md` — AskUserQuestion format for `other`-type URLs (not YouTube, not Telegram). Substitution: `{url_short}` (first 60 chars of the URL).
 
-Scripts в `scripts/` — building blocks, скилл вызывает их через Bash:
+Scripts in `scripts/` are building blocks; the skill calls them via Bash:
 
 | Script | Purpose | Args |
 |---|---|---|
-| `install-deps.sh` | Probe which tools installed | (none) |
+| `install-deps.sh` | Probe which tools are installed | (none) |
 | `extract-youtube.sh` | yt-dlp wrapper, subtitle cleanup | `<url> <output-dir>` |
 | `extract-telegram.sh` | public Telegram embed-page scrape | `<url> <output-dir>` |
 | `extract-html.sh` | pandoc / curl fallback | `<url> <output-dir>` |
 
-## Что делает скилл (по шагам)
+## What the skill does (step by step)
 
-1. **Прочитать note, найти URLs.** Regex `https?://[^\s)]+` (с trailing-punctuation strip). Классификация по домену: `youtube.com|youtu.be` → youtube, `t.me` → telegram, всё остальное → other.
-2. **Probe dependencies.** `bash scripts/install-deps.sh`. Если для нужных типов URL tool отсутствует — AskUserQuestion (install / skip / abort). НИКОГДА auto-install без OK.
-3. **Для каждого URL — extract.**
+1. **Read the note, find URLs.** Regex `https?://[^\s)]+` (with trailing-punctuation strip). Classify by domain: `youtube.com|youtu.be` → youtube, `t.me` → telegram, everything else → other.
+2. **Probe dependencies.** `bash scripts/install-deps.sh`. If a tool required for the URL types is missing — AskUserQuestion (install / skip / abort). NEVER auto-install without explicit OK.
+3. **For each URL — extract.**
    - YouTube → `bash scripts/extract-youtube.sh <url> <note>.extracted/<slug>/`
    - Telegram → `bash scripts/extract-telegram.sh <url> <note>.extracted/<slug>/`
-   - Other → AskUserQuestion через `roles/interactive-prompt.md`. По выбору: readable HTML / skip / custom command.
-   - Slug: `<type>-<short-id>` (например `youtube-dQw4w9WgXcQ`, `telegram-channel-123`, `html-blog-example-com`). Max 50 chars.
-   - Errors (404, private, fetch fail) — лог в `<note>.extracted/.errors.log`, URL не аннотируется, продолжать дальше.
-4. **Annotate note.** Для каждого SUCCESSFULLY extracted URL — append `→ [<local-path>](<local-path>)` сразу после URL в исходной note. Original URL preserved. Use Edit tool, не Write. Если URL уже annotated (есть `→ [./...]` сразу после) — skip unless `--force`.
-5. **Update .gitignore.** Add `*.extracted/` к `.gitignore` git root'а (если git initialized). Idempotent — `gitignore_add` из `bin/common.sh`.
-6. **Final report + commit.** Output 1 строка на URL (extracted / error / skipped), aggregate metrics. Auto-commit `extract: <N> URLs from <note>` (только processed-files, не вся ветка).
+   - Other → AskUserQuestion via `roles/interactive-prompt.md`. By choice: readable HTML / skip / custom command.
+   - Slug: `<type>-<short-id>` (e.g. `youtube-dQw4w9WgXcQ`, `telegram-channel-123`, `html-blog-example-com`). Max 50 chars.
+   - Errors (404, private, fetch fail) — log to `<note>.extracted/.errors.log`, do not annotate the URL, keep going.
+4. **Annotate the note.** For each SUCCESSFULLY extracted URL — append `→ [<local-path>](<local-path>)` right after the URL in the note. Original URL preserved. Use the Edit tool, not Write. If a URL is already annotated (`→ [./...]` directly after) — skip unless `--force`.
+5. **Update .gitignore.** Add `*.extracted/` to `.gitignore` at git root (if git is initialized). Idempotent — use `gitignore_add` from `bin/common.sh`.
+6. **Final report + commit.** One line per URL (extracted / error / skipped) plus aggregate metrics. Auto-commit `extract: <N> URLs from <note>` (only processed files, not the whole branch).
 
 ## Outputs
 
 Per processed note:
 - `<note>.extracted/<slug>/` — extracted content (per URL):
-  - YouTube: `subtitles.en.txt`, `subtitles.ru.txt` (если есть), `metadata.json`
+  - YouTube: `subtitles.en.txt`, `subtitles.ru.txt` (if available), `metadata.json`
   - Telegram: `post.md`, `media/urls.txt` + optional media files
   - HTML: `content.md`, `metadata.json`
-- `<note>.extracted/.errors.log` — errors per URL (если были)
-- `<note>` — модифицирован: рядом с каждым URL добавлен local pointer link
+- `<note>.extracted/.errors.log` — per-URL errors (if any)
+- `<note>` — modified: a local pointer link is appended next to each URL
 
 Git:
-- `.gitignore` — добавлен `*.extracted/`
-- Commit: `extract: <N> URLs from <note>` (encompasses note edit + .gitignore + не contents of .extracted/ т.к. они gitignored)
+- `.gitignore` — `*.extracted/` added
+- Commit: `extract: <N> URLs from <note>` (encompasses note edit + .gitignore; the contents of `.extracted/` are gitignored)
 
-## Связи с другими скиллами
+## Connections to other skills
 
-- **Вход:** Любой markdown-файл с URL'ами. Обычно — note или plan, перед `/cleanup` или ручной обработкой.
-- **Выход:** Аннотированная note с local pointers. Подходит для:
-  - `/cleanup` — теперь у cleanup есть offline-копии для gap detection
-  - `mattpocock:to-prd` / manual analysis — контент под рукой
-  - Голое чтение — пользователь открывает локальные файлы быстрее, чем браузер
-- **Не вызывает** другие скиллы автоматически. После Step 6: `Extracted N URLs from <note>. Run /cleanup next if needed.` — мягкая подсказка для типичного pipeline'а, без force'инга.
+- **Input:** any markdown file with URLs. Usually a note or plan before `/cleanup` or manual review.
+- **Output:** annotated note with local pointers. Suitable for:
+  - `/cleanup` — now has offline copies for gap detection
+  - `mattpocock:to-prd` / manual analysis — content at hand
+  - plain reading — the user opens local files faster than a browser
+- **Does not call** other skills automatically. After step 6: `Extracted N URLs from <note>. Run /cleanup next if needed.` — a soft hint for the typical pipeline, not a forced chain.
 
-## Правила
+## Rules
 
-### Общность
-Note — общий артефакт. После extract'а её будут читать пользователь, downstream скиллы, future-сессии. Если ты skip'ал URLs или потерял error info — все downstream работают с дырявой картой. Не "обработал почти все" — это "не обработал часть", и это надо явно репортить.
+### Commonality
+The note is a shared artifact. After extract, it'll be read by the user, downstream skills, and future sessions. If you skipped URLs or lost error info, everything downstream works from a holey map. Not "processed most of them" — that's "missed some", and it has to be reported explicitly.
 
-### Прежнее обязательство
-В шаге 2 ты обязался обработать КАЖДЫЙ URL — либо extracted, либо явно error'нут с reason. В шаге 4 ты обязался preserve original URL и append pointer (не replace). В шаге 5 — gitignore_add idempotent. Пропуск любого шага = withdrawing основание доверять final report.
+### Prior commitment
+In step 2 you committed to processing EVERY URL — either extracted, or explicitly errored with reason. In step 4 you committed to preserving the original URL and appending the pointer (not replacing). In step 5 — idempotent `gitignore_add`. Skipping any step withdraws the basis for trusting the final report.
 
-### Авторитет
-Скилл существует именно потому, что вручную extract'ить десяток URL — медленно и ошибкогенно. Если ты skip'аешь "ясно, что нерелевантно" без user prompt — ты в роли судьи относительно content, который не видел. Это не твоя роль; решение пропустить — у пользователя через AskUserQuestion.
+### Authority
+The skill exists precisely because extracting a dozen URLs by hand is slow and error-prone. If you skip "obviously irrelevant" URLs without prompting the user, you are judging content you haven't seen. That's not your role; the skip decision belongs to the user via AskUserQuestion.
 
-## Самопроверка перед выдачей результата
+## Self-check before delivering the result
 
-Прошёл бы этот результат ревью у синьора? Конкретно:
+Would this result pass review by a senior engineer? Concretely:
 
-- Все URL из note обработаны (extracted) ИЛИ явно error'нуты в final report (с reason)?
-- Оригинальная note корректно аннотирована — original URL preserved, pointer appended?
-- `<note>.extracted/` структура согласована (slug naming, metadata.json для каждого extract'а)?
-- `.gitignore` обновлён idempotent — нет дублирования строк?
-- Commit message reflects actual work — `extract: N URLs from <note>`?
-- Нет утёкших secrets в `<note>.extracted/` (auth tokens из API responses, личные данные)?
+- Were all URLs from the note processed (extracted) OR explicitly errored in the final report (with reason)?
+- Is the original note annotated correctly — original URL preserved, pointer appended?
+- Is the `<note>.extracted/` layout consistent (slug naming, metadata.json per extract)?
+- Is `.gitignore` updated idempotently — no duplicate lines?
+- Does the commit message reflect actual work — `extract: N URLs from <note>`?
+- No leaked secrets in `<note>.extracted/` (auth tokens from API responses, personal data)?
 
-Если "нет" хоть на один пункт — переделай, не отдавай.
+If "no" on any item — redo, don't ship.

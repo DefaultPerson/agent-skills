@@ -56,7 +56,7 @@ Fuzzy-matches every sorted line against rewritten AND against gaps file. Lines n
 
 ## Multi-file mode adjustments
 
-When cleanup runs on N source files (Phase 0 created `sources = [file1, file2, ...]`):
+When cleanup runs on N source files (step 1 created `sources = [file1, file2, ...]`):
 
 - Phase 4a/4b/4c run **per source** — each source has its own sorted, rewritten, gaps file, .uncovered.tmp.
 - 4b agent count: minimum 1 agent per source, regardless of section count per source.
@@ -66,16 +66,16 @@ When cleanup runs on N source files (Phase 0 created `sources = [file1, file2, .
 
 This is the core fix for multi-file laziness — without per-source scoping, keywords from file2 fluke-match in file1's grep, suppressing real gap detection.
 
-## Phase 8 — final verification against original backup
+## Phase 8 — final verification against the original backup
 
-After user applies gaps (Phase 7), run final coverage check against the ORIGINAL backup (not the sorted intermediate):
+After the user applies gaps (step 7), run a final coverage check against the ORIGINAL backup (not the sorted intermediate):
 
 ```bash
 python3 scripts/verify-coverage.py <file>.bak <basename>.rewritten.<ext> /dev/null
 ```
 
 If uncovered candidates exist → spawn agent(s) using `roles/coverage-verifier.md`. Substitutions: `{source_kind} = "backup"`, `{mode}` depends:
-- If Phase 4c found 0 TRUE_MISSING items AND sorted differs from backup only by added `## ` headers → `{mode} = "loose"`, single agent on whole uncovered list, expect mostly false positives.
+- If Phase 4c found 0 TRUE_MISSING items AND sorted differs from backup only by added `## ` headers → `{mode} = "loose"`, single agent on the whole uncovered list, expecting mostly false positives.
 - Otherwise → `{mode} = "strict"`, batches of 100 like Phase 4c.
 
-Different source (backup vs sorted) = different gaps surface. Don't reuse Phase 4c results.
+A different source (backup vs sorted) = a different gap surface. Don't reuse Phase 4c results.

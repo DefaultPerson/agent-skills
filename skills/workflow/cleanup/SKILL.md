@@ -21,9 +21,9 @@ allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, EnterPlanMode, ExitP
 
 Losslessly reorganize a messy notes/plan/chat dump into a clean sectioned markdown file, with three-level gap detection to prove nothing was lost.
 
-> **Буква = дух.** Если правило мешает достичь цели, ради которой оно
-> написано — правило ошибочно, а не цель. Не ищи лазейку в формулировке —
-> спроси, что правило защищает, и защищай это.
+> **Letter = spirit.** If a rule blocks you from reaching the goal it was
+> written for, the rule is wrong, not the goal. Don't look for a wording
+> loophole — ask what the rule is protecting, and protect that.
 
 ## Usage
 
@@ -33,53 +33,53 @@ Losslessly reorganize a messy notes/plan/chat dump into a clean sectioned markdo
 
 Multi-file: each input is processed independently end-to-end. Output is N cleaned files, NOT one merged file. (Opt-in `--merge` flag preserves legacy single-output behavior for back-compat.)
 
-## Слабые стороны и когда НЕ использовать
+## Weaknesses and when NOT to use
 
-- **Медленный и тщательный — оверкилл для коротких файлов.** Если файл уже структурирован по `## ` секциям и короче 30 строк — потеря времени, ручное редактирование быстрее.
-- **Расход контекста линеен по размеру входа.** Phase 4 (gap detection) спавнит фоновых агентов на больших файлах — следи за бюджетом. Для файлов >2000 строк подумай, можно ли разбить вход.
-- **Не работает с не-markdown форматами.** JSON/YAML/code dumps — другой инструмент.
-- **Не извлекает контент из ссылок** (YouTube, Telegram). Для этого — отдельный `/extract` перед `/cleanup`.
-- **Не суммирует.** Скилл preservation-first; если хочется сократить идеи — другой инструмент (например, mattpocock:to-prd для PRD-style summarization).
+- **Slow and thorough — overkill for short files.** If the file is already structured with `## ` sections and shorter than 30 lines, manual editing is faster.
+- **Context cost grows linearly with input size.** Phase 4 (gap detection) spawns background agents on large files — watch your budget. For files >2000 lines, consider splitting the input.
+- **Does not work with non-markdown formats.** JSON/YAML/code dumps — use a different tool.
+- **Does not extract content from links** (YouTube, Telegram). For that, run `/extract` before `/cleanup`.
+- **Does not summarize.** This skill is preservation-first; if you want to shrink ideas, use a different tool (e.g. `mattpocock:to-prd` for PRD-style summarization).
 
-## Как делать неправильно vs правильно
+## How to do it wrong vs right
 
 ### Multi-file input
 
-❌ **Плохо:** 3 файла на вход → конкатенирую в один merged-файл с `<!-- from: X -->` маркерами, прогоняю pipeline на merged → один output.
-- Source-provenance теряется после Phase 0.
-- Phase 4b keyword grep ловит keyword из file2 в file1 → ложное COVERED, замаскированный пропуск.
-- `<50-line skip` срабатывает по merged size, хотя per-source файлы могут быть тривиально малы или огромны независимо.
+❌ **Wrong:** 3 input files → concatenate into one merged file with `<!-- from: X -->` markers, run the pipeline on the merged file → one output.
+- Source provenance is lost after Phase 0.
+- Phase 4b keyword grep finds a keyword from file2 inside file1 → false COVERED, real gap masked.
+- The `<50-line skip` triggers on merged size even when per-source files are trivially small or huge independently.
 
-✅ **Хорошо:** 3 файла → 3 независимых pipeline'а Phase 1-8 → 3 cleaned output'а. Per-source backup, per-source gap detection, per-source verify. Final report aggregates метрики.
-- Provenance сохраняется end-to-end.
-- 4b скоупится по реальной секции реального source.
-- Опционально `--merge` flag для тех, кто полагался на merged output.
+✅ **Right:** 3 files → 3 independent Phase 1-8 pipelines → 3 cleaned outputs. Per-source backup, per-source gap detection, per-source verify. The final report aggregates metrics.
+- Provenance preserved end-to-end.
+- 4b is scoped to the real section of a real source.
+- Optional `--merge` flag for users who relied on merged output.
 
-### Phase 4 gap detection rigor
+### Phase 4 gap-detection rigor
 
-❌ **Плохо:** Файл <50 строк — пропустил Phase 4b целиком, доверился только 4c fuzzy-match.
-- 4c выдаёт только TRUE_MISSING. PARTIAL и REVERSED не ловятся.
-- Если в multi-file mode размер каждого источника <50 — все три проверки фактически деградируют.
+❌ **Wrong:** File under 50 lines — skip Phase 4b entirely, trust 4c fuzzy-match alone.
+- 4c only emits TRUE_MISSING. PARTIAL and REVERSED are not caught.
+- In multi-file mode, if every source is under 50 lines, all three checks effectively degrade.
 
-✅ **Хорошо:** Skip 4b только в single-file mode + <50 lines. В multi-file mode — 4b ВСЕГДА, минимум 1 агент на каждый source. Per-source keyword grep строго ограничен диапазоном строк своего источника.
+✅ **Right:** Skip 4b only in single-file mode with <50 lines. In multi-file mode, 4b ALWAYS runs, minimum 1 agent per source. Per-source keyword grep is strictly scoped to the source's own line range.
 
 ### Standalone framing
 
-❌ **Плохо:** В конце Phase 9 report подсовываю `Recommend: /clear then /clarify <file>`. Это пресуппозиция — пользователь, может, идёт в mattpocock:tdd, может в свой goal-feature, может вообще никуда.
+❌ **Wrong:** Phase 9 report ends with `Recommend: /clear then /clarify <file>`. That's a presupposition — the user might be going to `mattpocock:tdd`, to a goal feature, or nowhere at all.
 
-✅ **Хорошо:** Заканчиваю одной строкой: `Cleanup done. Run /clear before continuing.` Не рекомендую downstream-скиллы. Пользователь решает сам, что дальше.
+✅ **Right:** End with one line: `Cleanup done. Run /clear before continuing.` Don't recommend downstream skills. The user decides what's next.
 
-## Роли
+## Roles
 
-Скилл спавнит подагентов в Phase 4 и Phase 10. Шаблоны промптов:
+The skill spawns subagents in Phase 4 and Phase 10. Prompt templates:
 
 - `roles/gap-detector.md` — Phase 4b semantic compare per section
-- `roles/coverage-verifier.md` — Phase 4c и Phase 8 fuzzy-match verification
-- `roles/split-planner.md` — Phase 10 split plan (опционально)
+- `roles/coverage-verifier.md` — Phase 4c and Phase 8 fuzzy-match verification
+- `roles/split-planner.md` — Phase 10 split plan (optional)
 
-Подстановки:
+Substitutions:
 
-| Переменная | Источник |
+| Variable | Source |
 |---|---|
 | `{sorted_path}`, `{rewritten_path}` | Phase 1-3 output |
 | `{sections}` | per-agent assignment (1-2 sections) |
@@ -88,60 +88,60 @@ Multi-file: each input is processed independently end-to-end. Output is N cleane
 | `{mode}` | `strict` (default, batches of 100) / `loose` (Phase 8 optimization) |
 | `{cleaned_path}`, `{total_lines}`, `{section_list}` | Phase 10 input |
 
-Спавн: `Agent(subagent_type="Explore", run_in_background=true, prompt=substitute("roles/<role>.md", vars))`.
+Spawn: `Agent(subagent_type="Explore", run_in_background=true, prompt=substitute("roles/<role>.md", vars))`.
 
-## Что делает скилл (по шагам)
+## What the skill does (step by step)
 
-Каждый input-файл проходит через эти шаги независимо. Multi-file — N параллельных pipeline'ов.
+Each input file goes through these steps independently. Multi-file means N parallel pipelines.
 
-1. **Понять что на входе.** Single или multi-file. Validate markdown. Backup каждого источника (`<file>.bak`).
-2. **Привести секции в порядок.** Semantic sort: парсить `## ` секции, переносить misplaced строки в правильные секции, БЕЗ переписывания. Сохранять каждую оригинальную строку байт-в-байт. (Unicode caveat: Write-tool может нормализовать non-breaking spaces — если verify-sort валится, использовать Python для byte-copy.)
-3. **Проверить sort.** `python3 scripts/verify-sort.py <bak> <sorted>` — superset check. FAIL → restore + abort.
-4. **Переписать чисто.** Grammar, dedup точных копий, restructure через `### ` подсекции, clean chat artifacts (timestamps, emoji) в "Key takeaways" блоки. Все ИДЕИ preserve. Output: `<basename>.rewritten.<ext>`. Не использовать `<details>`/`<summary>` для critical content (gap detection это видит, но слабее).
-5. **Найти что потеряно.** Three-level gap detection — детали в `references/gap-detection.md`. Краткая суть: 4a script (URLs only) + 4b per-section semantic agents + 4c fuzzy coverage net. Все три обязательны в порядке. Output: `<basename>.gaps.md`.
-6. **Пауза — показать gaps пользователю.** Output report, ждать сигнала «готово». Если `gaps_count == 0` → пропустить ожидание, сразу Phase 8.
-7. **Применить решения.** Прочитать отредактированный gaps-файл. `[MISSING]`/`[UNCOVERED]` → insert. `[PARTIAL]` → augment. `[REVERSED]` → fix. Удалить gaps-файл.
-8. **Финально сверить с оригиналом.** `python3 scripts/verify-coverage.py <bak> <basename>.rewritten.<ext> /dev/null` против ОРИГИНАЛЬНОГО backup, не sorted (разные surfaces). Uncovered → spawn coverage-verifier агентов (см. `references/gap-detection.md` про strict vs loose mode). Если всё чисто → `mv <basename>.rewritten <file>`, оригинал заменён, `.bak` остаётся.
-9. **Report.** Метрики per-source + aggregate. Multi-file: список всех cleaned-файлов.
-10. **Опционально: split.** Если single output >100 строк И multiple distinct topics — предложить разбить на `spec-<slug>.md` + `references-<slug>.md`. См. `references/split-mode.md` (Phase 10-12 detail).
+1. **Understand the input.** Single or multi-file. Validate it's markdown. Backup every source (`<file>.bak`).
+2. **Sort sections.** Semantic sort: parse `## ` sections, move misplaced lines to the correct sections WITHOUT rewriting. Preserve every original line byte-for-byte. (Unicode caveat: the Write tool may normalize non-breaking spaces — if `verify-sort` fails, use Python for a byte-level copy.)
+3. **Verify sort.** `python3 scripts/verify-sort.py <bak> <sorted>` — superset check. FAIL → restore and abort.
+4. **Rewrite cleanly.** Fix grammar, dedupe exact copies, restructure with `### ` subsections, clean chat artifacts (timestamps, emoji) into "Key takeaways" blocks. Preserve every IDEA. Output: `<basename>.rewritten.<ext>`. Do not use `<details>`/`<summary>` for critical content (gap detection can see inside, but less reliably).
+5. **Find what was lost.** Three-level gap detection — details in `references/gap-detection.md`. Short version: 4a script (URLs only) + 4b per-section semantic agents + 4c fuzzy coverage net. All three are mandatory and ordered. Output: `<basename>.gaps.md`.
+6. **Pause — show gaps to the user.** Emit a report, wait for the "ready" signal. If `gaps_count == 0` → skip the wait and jump straight to step 8.
+7. **Apply decisions.** Read the edited gaps file. `[MISSING]`/`[UNCOVERED]` → insert. `[PARTIAL]` → augment. `[REVERSED]` → fix. Delete the gaps file.
+8. **Final compare against the original.** `python3 scripts/verify-coverage.py <bak> <basename>.rewritten.<ext> /dev/null` against the ORIGINAL backup, not sorted (different surfaces). Uncovered → spawn coverage-verifier agents (see `references/gap-detection.md` for strict vs loose mode). If everything is clean → `mv <basename>.rewritten <file>`, the original is replaced, `.bak` remains.
+9. **Report.** Per-source metrics plus aggregate. Multi-file: list every cleaned output.
+10. **Optional: split.** If a single output is >100 lines AND contains multiple distinct topics — offer to split into `spec-<slug>.md` + `references-<slug>.md`. See `references/split-mode.md` (Phase 10-12 detail).
 
-Детали процесса — в `references/gap-detection.md` и `references/split-mode.md`. Промпты подагентов — в `roles/`.
+Process details — in `references/gap-detection.md` and `references/split-mode.md`. Subagent prompts — in `roles/`.
 
 ## Outputs
 
 Per source (multi-file → multiply by N):
-- `<source>.bak` — нетронутая копия оригинала
-- `<source>` — финальный sorted + rewritten + gap-applied (оригинал перезаписан после Phase 8)
-- `<source>.gaps.md` — только пока gap'ы существуют, удаляется после Phase 7/8
-- Опционально (если запускали split): `<basename>/spec-*.md`, `<basename>/references-*.md`
+- `<source>.bak` — untouched copy of the original
+- `<source>` — final sorted + rewritten + gap-applied (the original is overwritten after step 8)
+- `<source>.gaps.md` — exists only while gaps remain, deleted after step 7/8
+- Optional (if split ran): `<basename>/spec-*.md`, `<basename>/references-*.md`
 
-Git: два коммита per source — `pre-cleanup: <name>` (snapshot) и `cleanup: rewrite <name>` (после Phase 9).
+Git: two commits per source — `pre-cleanup: <name>` (snapshot) and `cleanup: rewrite <name>` (after step 9).
 
-## Связи с другими скиллами
+## Connections to other skills
 
-- **Вход:** обычно `/cleanup` запускают на сыром файле из заметок/чата. Может вызываться сам по себе, может после `/extract` (если в notes есть URL'ы).
-- **Выход:** валидный sectioned markdown без unresolved-маркеров. Что с ним делать — решает пользователь (manual edit, `/clarify`, mattpocock:to-prd, прямой goal-feature input, etc.).
-- **Не вызывает** другие скиллы автоматически. После Phase 9: `Cleanup done. Run /clear before continuing.` — без рекомендаций downstream.
+- **Input:** typically a raw file from notes/chat. Can be invoked standalone, or after `/extract` if the notes contain URLs.
+- **Output:** valid sectioned markdown without unresolved markers. What to do with it is the user's call (manual edit, `/clarify`, `mattpocock:to-prd`, direct goal-feature input, etc.).
+- **Does not call** other skills automatically. After step 9: `Cleanup done. Run /clear before continuing.` — no downstream recommendation.
 
-## Правила
+## Rules
 
-### Общность
-Pipeline preservation-first потому что следующие шаги (clarify, manual edit, mattpocock) предполагают, что ничего не потерялось. Если ты позволил drop'у идеи в Phase 4 пройти "оно неважное" — следующий шаг работает с дырявой картой. Это не "помочь быстрее" — это сломать общую работу.
+### Commonality
+The pipeline is preservation-first because the next steps (clarify, manual edit, mattpocock) assume nothing was lost. If you let a dropped idea pass through Phase 4 as "probably unimportant", the next step works from a holey map. That is not "helping faster" — it is breaking the shared work.
 
-### Прежнее обязательство
-В шаге 3 (verify sort) ты обязался прогнать superset-check. В шаге 5 — все три уровня gap detection. В шаге 8 — финальную сверку против backup. Пропуск любого шага = withdrawing основание для финального verdict'а. Не "оптимизация" — нарушение контракта.
+### Prior commitment
+In step 3 (verify sort) you committed to running the superset check. In step 5 — all three gap-detection levels. In step 8 — the final compare against backup. Skipping any step withdraws the basis for the final verdict. Not "optimization" — contract violation.
 
-### Авторитет (multi-file)
-Multi-file mode разделён на N независимых pipeline'ов именно потому, что merged-конкатенация теряла provenance и масковала gap'ы. Если ты в multi-file mode конкатенируешь "ради простоты" — ты возвращаешь баг, ради которого этот скилл переделывался.
+### Authority (multi-file)
+Multi-file mode was split into N independent pipelines specifically because merged concatenation lost provenance and masked gaps. If you concatenate "for simplicity" in multi-file mode, you are reintroducing the bug this skill was rewritten to fix.
 
-## Самопроверка перед выдачей результата
+## Self-check before delivering the result
 
-Прошёл бы этот документ ревью у синьора-инженера, которому по нему строить систему? Конкретно:
+Would this document pass review by a senior engineer who has to build the system from it? Concretely:
 
-- Каждая `## ` секция в правильном месте; нет фрагментов "не туда попало"?
-- Нет `[MISSING]`/`[PARTIAL]`/`[REVERSED]`/`[UNCOVERED]` маркеров?
-- В multi-file mode — N output-файлов, не один merged?
-- `verify-coverage.py` против backup прошёл с TRUE_MISSING = 0?
-- Backup-файлы (`.bak`) на месте — есть путь отката?
+- Every `## ` section in the right place; no fragments "stuck in the wrong place"?
+- No `[MISSING]`/`[PARTIAL]`/`[REVERSED]`/`[UNCOVERED]` markers left?
+- In multi-file mode — N output files, not one merged?
+- `verify-coverage.py` against backup passed with TRUE_MISSING = 0?
+- Backup files (`.bak`) in place — there's a path to roll back?
 
-Если "нет" хоть на один пункт — переделай, не отдавай.
+If "no" on any item — redo, don't ship.

@@ -1,66 +1,66 @@
 # Gap detector — per-section semantic comparison
 
-Ты сравниваешь СЕКЦИИ sorted-файла с соответствующими секциями rewritten-файла, чтобы найти MISSING / PARTIAL / REVERSED идеи. Это Phase 4b в пайплайне cleanup: per-section semantic check после deterministic URL-check, до fuzzy coverage net.
+You compare SECTIONS of the sorted file against the matching sections of the rewritten file, looking for MISSING / PARTIAL / REVERSED ideas. This is Phase 4b in the cleanup pipeline: per-section semantic check after the deterministic URL check, before the fuzzy coverage net.
 
-## Входные данные
+## Inputs
 
-- **Сортированный файл (источник истины):** `{sorted_path}`
-- **Переписанный файл (проверяемый):** `{rewritten_path}`
-- **Секции для сравнения (этому агенту):** `{sections}` — например, `## Tasks`, `## References`. От 1 до 2 секций per agent.
+- **Sorted file (source of truth):** `{sorted_path}`
+- **Rewritten file (to be checked):** `{rewritten_path}`
+- **Sections to compare (assigned to this agent):** `{sections}` — e.g. `## Tasks`, `## References`. Between 1 and 2 sections per agent.
 
-## Что делать
+## What to do
 
-Используй инструмент Grep для поиска ключевых фраз из каждой sorted-строки. НЕ полагайся на ручное чтение для больших файлов. Для каждой строки grep'ни 3-5 уникальных слов в rewritten-файле.
+Use the Grep tool to search for key phrases from each sorted line. Do NOT rely on manual reading for large files. For each line, grep 3-5 unique words in the rewritten file.
 
-**Важно:** rewritten-файл может содержать HTML-блоки (`<details>`, `<summary>`, `<table>`). Контент ВНУТРИ этих тегов считается присутствующим — ищи Grep'ом внутри них. Строка, найденная внутри `<details>...</details>`, COVERED.
+**Important:** the rewritten file may contain HTML blocks (`<details>`, `<summary>`, `<table>`). Content INSIDE those tags counts as present — grep inside them too. A line found inside `<details>...</details>` is COVERED.
 
-Для КАЖДОЙ непустой строки в твоих секциях sorted-файла:
+For EVERY non-empty line in your assigned sections of the sorted file:
 
-1. Поиск семантического эквивалента в rewritten (поиск по ВСЕМУ файлу, не только по той же секции).
-2. Найден с тем же смыслом → SKIP.
-3. Найден, но детали потеряны → **PARTIAL** (цитируй обе строки + что потеряно).
-4. Смысл изменён/инвертирован → **REVERSED** (цитируй обе строки).
-5. Не найден нигде → **MISSING** (цитируй sorted-строку).
+1. Search for a semantic equivalent in rewritten (search the WHOLE file, not just the same section).
+2. Found with the same meaning → SKIP.
+3. Found but details lost → **PARTIAL** (quote both lines + what was lost).
+4. Meaning changed/inverted → **REVERSED** (quote both lines).
+5. Not found anywhere → **MISSING** (quote the sorted line).
 
-## Что НЕ считается gap
+## What is NOT a gap
 
-- Изменения грамматики/форматирования: "setup nginx" → "Set up Nginx" — норм.
-- bullet → checkbox, изменения регистра, исправление опечаток, пунктуация, изменения link text.
-- Слияние нескольких рядом стоящих предложений в одно с сохранением смысла.
-- Перефразировка с сохранением идеи и всех деталей — всегда SKIP, независимо от формата.
+- Grammar/formatting changes: "setup nginx" → "Set up Nginx" is fine.
+- bullet → checkbox, case changes, typo fixes, punctuation, link-text changes.
+- Merging several adjacent sentences into one while preserving meaning.
+- Rephrasing with the idea and all details preserved — always SKIP, regardless of format.
 
-## Что считается PARTIAL
+## What counts as PARTIAL
 
-PARTIAL — только когда КОНКРЕТНАЯ ИДЕЯ, ДЕТАЛЬ или КОНТЕКСТ потеряны (а не форматирование). Если из строки `Pricing: $50/mo, 14-day trial` в rewritten осталось только `Pricing: $50/mo` — PARTIAL, потеряно `14-day trial`. Если из `URL https://example.com/post/123` осталось `https://example.com` — PARTIAL.
+PARTIAL only when a CONCRETE IDEA, DETAIL, or CONTEXT is lost (not formatting). If `Pricing: $50/mo, 14-day trial` becomes `Pricing: $50/mo` in rewritten — PARTIAL, the `14-day trial` is lost. If `URL https://example.com/post/123` shrinks to `https://example.com` — PARTIAL.
 
-## Доказательство обязательно
+## Evidence is mandatory
 
-Ты ОБЯЗАН процитировать точный текст обеих файлов. Если не можешь процитировать rewritten-эквивалент — он MISSING. Без доказательств находки не принимаются.
+You MUST quote the exact text from both files. If you cannot quote the rewritten equivalent, it IS missing. Findings without quotes are not accepted.
 
-## Output формат
+## Output format
 
-Для каждой находки:
+For each finding:
 
 ```
 SECTION: <header>
 TYPE: MISSING|PARTIAL|REVERSED
 SORTED_LINE: "<exact quote>"
 REWRITTEN_LINE: "<exact quote or NOT_FOUND>"
-LOST_DETAIL: "<what was lost>" (только для PARTIAL)
+LOST_DETAIL: "<what was lost>" (PARTIAL only)
 ```
 
-Если в твоих секциях gap'ов нет — одна строка:
+If no gaps in your sections — one line:
 ```
 NO GAPS in [sections]
 ```
 
-## Антипаттерны
+## Anti-patterns
 
-❌ Помечать перефразировку как PARTIAL — это не gap, это reformulation.  
-❌ Цитировать без кавычек — затрудняет dedup в Phase 5.  
-❌ Длинные explanations — только маркер + цитата + lost detail.  
-❌ Заявлять MISSING без grep'а ВСЕГО файла, включая `<details>` блоки.
+❌ Marking a rephrase as PARTIAL — that's not a gap, it's a reformulation.
+❌ Quoting without quotes — makes dedup in Phase 5 harder.
+❌ Long explanations — only marker + quote + lost detail.
+❌ Reporting MISSING without grepping the WHOLE file, including `<details>` blocks.
 
-## Прежнее обязательство
+## Prior commitment
 
-В шаге «Поиск семантического эквивалента» ты обязался grep'ать по ВСЕМУ rewritten-файлу, не только по той же секции. Идея может переехать в другую секцию при rewrite — это не gap. Пропуск этого шага = ложные MISSING, которые ломают доверие пользователя к pipeline'у. Не повод оптимизировать.
+In step "Search for a semantic equivalent" you committed to grepping the WHOLE rewritten file, not just the matching section. An idea may have moved to another section during rewrite — that's not a gap. Skipping this step → false MISSINGs that break the user's trust in the pipeline. Not an "optimization" to drop.

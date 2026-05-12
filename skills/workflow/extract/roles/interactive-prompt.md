@@ -1,10 +1,10 @@
-# Interactive prompt — handle URL that isn't YouTube or Telegram
+# Interactive prompt — handle a URL that isn't YouTube or Telegram
 
-Это не subagent — это format-контракт для AskUserQuestion, который extract спрашивает в Phase 2 для каждого URL, который НЕ матчится с известными extractor'ами (YouTube, Telegram).
+This is not a subagent — it's a format contract for the AskUserQuestion extract calls in step 2 for each URL that doesn't match a known extractor (YouTube, Telegram).
 
-## Когда используется
+## When it's used
 
-В Phase 2 extract-pipeline'а, для каждого URL, классифицированного как `other` (не yt-dlp, не tchan).
+In step 2 of the extract pipeline, for each URL classified as `other` (not yt-dlp, not Telegram).
 
 Examples:
 - arXiv paper PDF
@@ -14,21 +14,21 @@ Examples:
 - Notion public page
 - Documentation page
 
-## Формат вопроса (через AskUserQuestion)
+## Question format (via AskUserQuestion)
 
-Один вопрос per URL. Если URL'ов много "other"-типа — batch-update: спросить про все сразу через ОДИН AskUserQuestion с несколькими `questions` (но max 4 questions per call).
+One question per URL. If many "other" URLs — batch them: ask about all of them via a SINGLE AskUserQuestion with multiple `questions` (but max 4 questions per call).
 
 **Question:** `URL <url-short> — how to handle?`
-- `<url-short>` = первые 60 символов URL, не весь длинный
+- `<url-short>` = first 60 characters of the URL, not the whole long string
 
-**Header:** `URL handling` (или короче, max 12 chars)
+**Header:** `URL handling` (or shorter, max 12 chars)
 
 **Options:**
-1. **"Readable text (Recommended)"** — runs `extract-html.sh`, pandoc/curl fallback. Trade-off: лучше для статей, плохо для intensive-JS SPA.
-2. **"Skip"** — оставляет URL без аннотации, error log в final report. Use case: URL уже знаком, не нужен offline-доступ.
-3. **"Custom command"** — пользователь подсунет shell-команду, которой обработать. Use case: специфичный extractor (например, `gh gist view`, `curl ... | jq`).
+1. **"Readable text (Recommended)"** — runs `extract-html.sh`, pandoc/curl fallback. Trade-off: good for articles, bad for JS-heavy SPAs.
+2. **"Skip"** — leaves the URL un-annotated, logs an error in the final report. Use case: URL is already familiar, no offline copy needed.
+3. **"Custom command"** — the user supplies a shell command to handle it. Use case: specific extractor (e.g. `gh gist view`, `curl ... | jq`).
 
-## Пример
+## Example
 
 ```
 Question: URL https://arxiv.org/abs/2403.17211 — how to handle?
@@ -42,14 +42,14 @@ Options:
     description: "User provides shell command (e.g. 'curl ... | pdf2text')."
 ```
 
-При выборе "Custom command" — следующий AskUserQuestion: «What command? (text input expected)».
+When "Custom command" is selected — the next AskUserQuestion: "What command? (text input expected)".
 
-## Антипаттерны
+## Anti-patterns
 
-❌ Спрашивать про каждый URL отдельно, если в note 10+ URLs одного типа.  
-❌ Force-выбор Readable text без option для skip — пользователь может явно не хотеть offline copy.  
-❌ Игнорировать "Custom command" path — это escape hatch для edge cases (PDF papers, video от не-YouTube хостингов, etc.).
+❌ Asking about each URL separately when the note has 10+ URLs of the same type.
+❌ Forcing Readable text without a skip option — the user may explicitly not want an offline copy.
+❌ Ignoring the "Custom command" path — it's the escape hatch for edge cases (PDF papers, video from non-YouTube hosts, etc.).
 
-## Общность
+## Commonality
 
-Pipeline preservation-first: каждый URL ДОЛЖЕН быть либо processed, либо явно error'нут в final report. Если ты автоматически skip'аешь "other" URLs без user prompt — пользователь не узнает, что часть контента пропущена.
+Pipeline is preservation-first: every URL MUST be either processed or explicitly errored in the final report. If you auto-skip "other" URLs without a user prompt, the user doesn't know some content was missed.

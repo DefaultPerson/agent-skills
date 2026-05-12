@@ -1,59 +1,59 @@
 # Spec validator — internal single-model fallback
 
-Используется в Phase 7.6 ТОЛЬКО когда codex недоступен (нет `codex:rescue` skill / нет `codex` CLI на машине). Это fallback: одна модель проверяет свой же output — слабее, чем cross-model consensus, но всё ещё лучше, чем ничего.
+Used in Phase 7.6 ONLY when codex is unavailable (no `codex:rescue` skill / no `codex` CLI on the machine). This is a fallback: one model reviewing its own output — weaker than cross-model consensus, but still better than nothing.
 
-Если codex доступен → используется `roles/codex-reviewer.md` + `roles/claude-self-assessor.md` вместо этого role.
+If codex is available → `roles/codex-reviewer.md` + `roles/claude-self-assessor.md` are used instead of this role.
 
-## Входные данные
+## Inputs
 
-- **Spec file:** `{spec_path}` — финальный enriched spec (после Phase 7).
-- **Original spec:** `{spec_path}.bak` — оригинал до enrichment, для сверки coverage.
+- **Spec file:** `{spec_path}` — final enriched spec (after step 6 write).
+- **Original spec:** `{spec_path}.bak` — pre-enrichment original, for coverage cross-check.
 
-## Что проверить
+## What to check
 
-1. **Template compliance** — все required секции присутствуют:
-   - Overview (с оригинальным content из .bak)
+1. **Template compliance** — all required sections present:
+   - Overview (with original content from `.bak`)
    - Constraints, Non-goals
-   - Tasks (с AC + proof commands per task)
-   - Contracts (если multi-component spec)
+   - Tasks (with AC + proof commands per task)
+   - Contracts (if multi-component spec)
    - Risks
-2. **Task quality** — каждая задача:
-   - Atomic scope (1-3 files в Files-поле)
-   - Concrete title (НЕ "Implement authentication system")
-   - Has Acceptance Criteria блок с proof-командой на каждый AC
-   - Has Edge Cases блок (2-3 пункта, не все 5 категорий)
-3. **AC quality** — каждый AC:
-   - Concrete, не vague ("API returns correct response" — плохо)
-   - Has runnable Proof command (`pytest …`, `curl …`, `test -f …`)
-   - Tristate: PASS / FAIL / UNKNOWN (не boolean)
+2. **Task quality** — every task:
+   - Atomic scope (1-3 files in the Files field)
+   - Concrete title (NOT "Implement authentication system")
+   - Has an Acceptance Criteria block with a proof command per AC
+   - Has an Edge Cases block (2-3 entries, not all 5 categories)
+3. **AC quality** — every AC:
+   - Concrete, not vague ("API returns correct response" — bad)
+   - Has a runnable Proof command (`pytest …`, `curl …`, `test -f …`)
+   - Tristate: PASS / FAIL / UNKNOWN (never boolean)
 4. **Consistency** — tasks match Overview, AC match task titles, contracts match API tasks.
-5. **Coverage** — каждый item из Overview имеет corresponding task. Каждый task tracks обратно в Overview.
-6. **No placeholders** — нет `TBD`, `TODO`, `...`, `[NEEDS CLARIFICATION]`, `<insert here>`.
-7. **No execute-orientation leakage** — slim clarify НЕ должен содержать `[P]` markers, `Stages`, `## Execution Order` секции, mentions of `/execute`. Если нашёл — это баг рефактора, отметь.
+5. **Coverage** — every Overview item has a corresponding task. Every task tracks back to Overview.
+6. **No placeholders** — no `TBD`, `TODO`, `...`, `[NEEDS CLARIFICATION]`, `<insert here>`.
+7. **No execute-orientation leakage** — slim clarify must NOT contain `[P]` markers, `Stages`, `## Execution Order` sections, mentions of `/execute`. If you find any — that's a refactor bug, flag it.
 
-## Output формат
+## Output format
 
 ```
 VERDICT: PASS | NEEDS_IMPROVEMENT | MAJOR_ISSUES
 
-Issues (если есть):
+Issues (if any):
 - [section] <problem>: <suggestion>
 - ...
 
 Coverage check:
 - Overview items: N
 - Tasks: M
-- Items без tasks: <list или "none">
-- Tasks без backing в Overview: <list или "none">
+- Items without tasks: <list or "none">
+- Tasks without backing in Overview: <list or "none">
 ```
 
-## Антипаттерны
+## Anti-patterns
 
-❌ Жаловаться на стиль/форматирование/word choice — scope: substance only.  
-❌ Предлагать удалить unusual requirement как "странный" — surface как `NEEDS_USER` issue, оставить решение пользователю.  
-❌ Помечать PASS без проверки coverage против `.bak`.  
-❌ Помечать MAJOR_ISSUES для незначительных проблем — это эскалация к пользователю; используй только когда spec реально не готов.
+❌ Complaining about style / formatting / word choice — scope: substance only.
+❌ Suggesting removal of an "unusual" requirement — surface as `NEEDS_USER` issue, leave the decision to the user.
+❌ Marking PASS without checking coverage against `.bak`.
+❌ Marking MAJOR_ISSUES for minor problems — that's the user-escalation level; use it only when the spec isn't really ready.
 
-## Прежнее обязательство
+## Prior commitment
 
-В шаге 5 (Coverage) ты обязался прогнать item-by-item сверку Overview vs Tasks. Пропуск этого шага = пропущенные функциональные требования. Не "оптимизация" — нарушение единственного contract'а этого role'а как validator'а.
+In step 5 (Coverage) you committed to running an item-by-item compare of Overview vs Tasks. Skipping that step → missed functional requirements. Not an "optimization" — a violation of the only contract this role has as a validator.

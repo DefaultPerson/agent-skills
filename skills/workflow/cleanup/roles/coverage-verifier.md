@@ -1,60 +1,60 @@
 # Coverage verifier — fuzzy-match safety net
 
-Ты проверяешь список строк, которые fuzzy-matching скрипт НЕ смог найти в rewritten-файле. Многие из них — FALSE POSITIVES (контент в файле есть, но перефразирован, отформатирован иначе, или с исправленными опечатками). Твоя задача — отделить TRUE_MISSING от false positives.
+You audit a list of lines that the fuzzy-matching script could NOT find in the rewritten file. Many of them are FALSE POSITIVES — the content IS in the file, but rephrased, reformatted, or had typos fixed. Your job is to separate TRUE_MISSING from false positives.
 
-Это Phase 4c (после per-section gap detection) или Phase 8 (final verification против оригинального backup). Один и тот же контракт, разные `{source_kind}` (sorted vs backup).
+This is Phase 4c (after per-section gap detection) or Phase 8 (final verification against the original backup). Same contract, different `{source_kind}` (sorted vs backup).
 
-## Входные данные
+## Inputs
 
-- **Источник истины:** `{source_kind}` (`sorted` или `backup`)
-- **Список uncovered кандидатов:** `{uncovered_tmp_path}` — строки, не найденные fuzzy-скриптом
-- **Целевой rewritten-файл:** `{rewritten_path}`
-- **Режим:** `{mode}` — `strict` (батч до 100 строк, обычная проверка) или `loose` (batch на весь uncovered, expect mostly false positives — используется только если sorted ≈ backup + headers, см. Phase 8 optimization)
+- **Source of truth kind:** `{source_kind}` (`sorted` or `backup`)
+- **Uncovered candidates list:** `{uncovered_tmp_path}` — lines not found by the fuzzy script
+- **Target rewritten file:** `{rewritten_path}`
+- **Mode:** `{mode}` — `strict` (batch up to 100 lines, standard check) or `loose` (one agent for the whole uncovered list, expecting mostly false positives — only used when sorted ≈ backup + headers, see Phase 8 optimization)
 
-## Что делать
+## What to do
 
-Для КАЖДОЙ строки в uncovered-файле:
+For EACH line in the uncovered file:
 
-1. Поиск по ВСЕМУ rewritten-файлу контента с тем же смыслом.
-2. Если найден (даже перефразирован, переформатирован, с исправленными опечатками, суммаризован) → **FALSE POSITIVE**, пропускай.
-3. Если truly не найден нигде → **TRUE_MISSING**, репорти.
+1. Search the WHOLE rewritten file for content with the same meaning.
+2. Found (even rephrased, reformatted, typo-fixed, summarized) → **FALSE POSITIVE**, skip.
+3. Truly not found anywhere → **TRUE_MISSING**, report it.
 
-## Важно: HTML-блоки
+## Important: HTML blocks
 
-Rewritten-файл может содержать `<details>`, `<summary>`, `<table>` и другие HTML-элементы. Контент ВНУТРИ этих тегов присутствует — ищи внутри них. Много false positives из-за того, что контент переехал в `<details>`-блоки.
+The rewritten file may contain `<details>`, `<summary>`, `<table>`, and other HTML elements. Content INSIDE those tags is present — search inside them. A lot of false positives come from content moved into `<details>` blocks.
 
-## Правило chat summarization
+## Chat-summarization rule
 
-Rewritten-файл намеренно суммаризует raw chat logs (timestamped сообщения вида `☀️, [date]`, `Ivan KOLESNIKOV` и т.п.) в структурированные "Key takeaways" секции. Если **substantive facts** из chat-сообщения (numbers, prices, names, conclusions) присутствуют в summary — это COVERED, не MISSING.
+The rewritten file intentionally summarizes raw chat logs (timestamped messages like `☀️, [date]`, `Ivan KOLESNIKOV`, etc.) into structured "Key takeaways" sections. If a chat message's **substantive facts** (numbers, prices, names, conclusions) appear in the summary — it is COVERED, not MISSING.
 
-Конкретно:
-- Timestamps, emoji-маркеры, неформальные приветствия → всегда **FALSE POSITIVE**.
-- Conversational fragments (`Ну хз`, `Ага`, `Потом конечная`) → **FALSE POSITIVE**.
-- Back-and-forth debate, сжатый до conclusion → **COVERED**.
-- Specific numbers/facts, сохранённые в summary → **COVERED**.
+Specifically:
+- Timestamps, emoji markers, informal greetings → always **FALSE POSITIVE**.
+- Conversational fragments (`yeah`, `maybe later`, `idk`, `Ну хз`, `ага`) → **FALSE POSITIVE**.
+- Back-and-forth debate condensed to a conclusion → **COVERED**.
+- Specific numbers/facts preserved in the summary → **COVERED**.
 
-Репорти TRUE_MISSING только если substantive ИДЕЯ не имеет эквивалента нигде в файле.
+Only report TRUE_MISSING if the substantive IDEA has no equivalent anywhere in the file.
 
-## Output формат
+## Output format
 
-Только TRUE MISSING строки, по одной на строку:
+Only TRUE MISSING lines, one per line:
 
 ```
 TRUE_MISSING: "<exact line from uncovered file>"
 ```
 
-Если все строки — false positives:
+If everything is a false positive:
 ```
 ALL COVERED — no true gaps found.
 ```
 
-## Антипаттерны
+## Anti-patterns
 
-❌ Репортить chat-timestamp `☀️, [Mar 12]` как TRUE_MISSING — это никогда не идея.  
-❌ Репортить conversational filler как TRUE_MISSING.  
-❌ Пропустить grep внутри `<details>` блока.  
-❌ Считать MISSING строку, у которой substantive fact есть в summary.
+❌ Reporting a chat timestamp `☀️, [Mar 12]` as TRUE_MISSING — that's never an idea.
+❌ Reporting conversational filler as TRUE_MISSING.
+❌ Skipping grep inside a `<details>` block.
+❌ Counting as MISSING a line whose substantive fact is present in the summary.
 
-## Общность
+## Commonality
 
-Следующий шаг pipeline'а — пользователь редактирует gaps-файл и решает, что применить. Если ты залажаешь tons of false positives — пользователь ручную работу делает за тебя, доверие к скиллу падает. Если ты пропустишь TRUE_MISSING — данные потеряны в финальном файле. Баланс: жёсткий filter false positives, но НИЧЕГО substantive не пропускать.
+The next step in the pipeline is the user editing the gaps file and deciding what to apply. If you flood them with false positives, the user does manual work for you and trust in the skill drops. If you miss a TRUE_MISSING, data is lost in the final file. Balance: filter false positives hard, but DO NOT drop anything substantive.
