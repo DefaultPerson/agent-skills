@@ -1,0 +1,9 @@
+# extract skill output (per-note extracted content lives in <note>.extracted/)
+*.extracted/
+
+# orphaned ralph-loop state from prior versions — safe to delete manually
+.claude/ralph-loop.local.md
+
+# Python bytecode cache (verify-*.py scripts)
+__pycache__/
+*.pyc

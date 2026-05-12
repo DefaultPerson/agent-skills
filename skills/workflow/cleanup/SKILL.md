@@ -1,486 +1,147 @@
 ---
 name: cleanup
 description: >
-  Clean up and restructure messy notes/plans: semantic sort, AI rewrite,
-  100% verified gap detection, optional split into spec + references.
-  Triggers: "cleanup", "/cleanup", "почисти", "реорганизуй", "clean up",
-  "plan-rewrite", "/plan-rewrite", "rewrite plan", "sort plan"
-allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, EnterPlanMode, ExitPlanMode]
+  Use when you have a messy notes/plan/chat dump (50+ lines, mixed topics,
+  no clear structure) that needs lossless reorganization into a clean
+  sectioned markdown file. Slow and thorough — overkill for files under
+  30 lines or already-sectioned docs. Triggers: "cleanup", "/cleanup",
+  "почисти", "реорганизуй", "clean up", "rewrite plan", "sort plan",
+  "plan-rewrite", "/plan-rewrite".
+when_to_use: >
+  The input is unstructured (chat exports, dumped notes, brainstorm), >50
+  lines, and the user wants the content cleaned without losing ideas. Works
+  on multiple input files — produces one cleaned output per input, NOT one
+  merged file. Do NOT use for already-structured docs, files under 30 lines,
+  or when the user wants summarization (cleanup preserves everything; it
+  doesn't compress ideas).
+allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, EnterPlanMode, ExitPlanMode, AskUserQuestion]
 ---
 
-# Cleanup Skill
+# Cleanup
 
-Clean up, reorganize, and optionally split a plan file with **100% verified** gap detection.
+Losslessly reorganize a messy notes/plan/chat dump into a clean sectioned markdown file, with three-level gap detection to prove nothing was lost.
+
+> **Letter = spirit.** If a rule blocks you from reaching the goal it was
+> written for, the rule is wrong, not the goal. Don't look for a wording
+> loophole — ask what the rule is protecting, and protect that.
 
 ## Usage
 
 ```
-/cleanup <file path> [file2] [file3]
+/cleanup <file> [file2] [file3] ...
 ```
 
-Multiple files: concatenated with `<!-- from: filename -->` markers, sorted together.
-
-## Algorithm
-
-$ARGUMENTS
-
-Arguments: `<file path> [file2] [file3]`
-
-### Phase 0: Input Handling
-
-1. **Validate**: If no argument — ask for file path (AskUserQuestion).
-2. **Multi-file**: If multiple files provided:
-   - Backup each: `cp <fileN> <fileN>.bak`
-   - Concatenate into first file path with section markers:
-     ```
-     <!-- from: file1.md -->
-     <contents of file1>
-     
-     <!-- from: file2.md -->
-     <contents of file2>
-     ```
-   - Continue with the concatenated file as input.
-3. **Single file**: proceed to Phase 1.
+Multi-file: each input is processed independently end-to-end. Output is N cleaned files, NOT one merged file. (Opt-in `--merge` flag preserves legacy single-output behavior for back-compat.)
 
-### Phase 1: Sort
+## Weaknesses and when NOT to use
 
-1. **Backup** (if single file): `cp <file> <file>.bak`
-3. **Semantic sort** (AI — you do this directly):
-   - Parse sections by `## ` headers.
-   - Orphan lines before first header → create a header for them.
-   - **Semantic audit**: go through EVERY non-empty line in EVERY section. If a line's topic doesn't match its section — move it to the correct section. If no suitable section exists — create a new one.
-   - Insert moved lines before the first `### ` subsection in the target section. Respect code block boundaries (``` ... ```).
-   - Collapse consecutive blank lines (max 1).
-   - Preserve frontmatter at the top.
-   - Preserve every original line exactly as-is — no rewording, no reformatting. You MAY add new `## ` headers for organization, but NEVER delete or rename existing lines. Header cleanup happens in Phase 3.
-4. **Write** sorted version to original file path.
-   - **Unicode caution**: The Write tool may normalize Unicode (losing non-breaking spaces U+00A0 etc.). If verify-sort.py shows missing lines — check `repr()` of lines for `\xa0` and similar characters, then use Python for byte-for-byte copying from the original.
+- **Slow and thorough — overkill for short files.** If the file is already structured with `## ` sections and shorter than 30 lines, manual editing is faster.
+- **Context cost grows linearly with input size.** Phase 4 (gap detection) spawns background agents on large files — watch your budget. For files >2000 lines, consider splitting the input.
+- **Does not work with non-markdown formats.** JSON/YAML/code dumps — use a different tool.
+- **Does not extract content from links** (YouTube, Telegram). For that, run `/extract` before `/cleanup`.
+- **Does not summarize.** This skill is preservation-first; if you want to shrink ideas, use a different tool (e.g. `mattpocock:to-prd` for PRD-style summarization).
 
-### Phase 2: Verify Sort
+## How to do it wrong vs right
 
-Run the verification script:
+### Multi-file input
 
-```bash
-python3 scripts/verify-sort.py <file>.bak <file>
-```
-
-- The script checks that ALL original lines are present in sorted (superset check). New lines (added headers) are OK.
-- If FAIL (original lines missing) → restore from backup, ABORT, report error.
-- If PASS → continue.
-
-### Phase 3: Rewrite
-
-Rewrite the sorted file into a clean, well-structured document. Create `<basename>.rewritten.<ext>`:
-
-- Fix grammar, punctuation, style, typos.
-- Remove exact duplicates (same meaning — keep the more detailed version).
-- Restructure: add `## ` section summaries, create `### ` subsections where logical.
-- Clean up chat artifacts: timestamps (☀️, Ivan KOLESNIKOV), informal fragments → integrate into structured items.
-- Rephrase unclear/broken sentences for clarity.
-- Convert unstructured notes into actionable items where possible.
-- Consolidate related items within the same section.
-
-**Chat log handling:**
-- Extract and PRESERVE: specific numbers, prices, URLs, actionable insights, named entities.
-- Summarize back-and-forth debate into key positions with attribution.
-- If a chat section has >50 lines, create a "Key takeaways" subsection + keep raw data points as bullets.
-- NEVER reduce a chat section to <20% of its original line count.
+❌ **Wrong:** 3 input files → concatenate into one merged file with `<!-- from: X -->` markers, run the pipeline on the merged file → one output.
+- Source provenance is lost after Phase 0.
+- Phase 4b keyword grep finds a keyword from file2 inside file1 → false COVERED, real gap masked.
+- The `<50-line skip` triggers on merged size even when per-source files are trivially small or huge independently.
 
-Constraints:
-- MUST preserve ALL ideas, tasks, links, URLs, references — every distinct thought must survive.
-- DO NOT merge DIFFERENT tasks that seem related but are distinct.
-- DO NOT drop informal notes/questions — they may contain important context. Rephrase but keep.
-- The gap detection pipeline will catch any losses, so focus on producing a CLEAN readable plan.
-- AVOID using `<details>` / `<summary>` HTML blocks for critical content. Gap detection agents and scripts search raw text and may miss content inside HTML tags. If you use `<details>`, duplicate key facts outside the collapsible block (e.g., in a summary line above it).
-
-### Phase 4: Gap Detection (three levels)
+✅ **Right:** 3 files → 3 independent Phase 1-8 pipelines → 3 cleaned outputs. Per-source backup, per-source gap detection, per-source verify. The final report aggregates metrics.
+- Provenance preserved end-to-end.
+- 4b is scoped to the real section of a real source.
+- Optional `--merge` flag for users who relied on merged output.
 
-#### 4a: Deterministic check (script)
-
-```bash
-python3 scripts/verify-rewrite.py <sorted> <rewritten>
-```
-
-Extracts and compares URLs (only). Report missing URLs.
-
-#### 4b: Semantic check (pre-filter + background agents)
-
-> **Small file optimization**: If sorted file has <50 non-empty content lines → skip 4b entirely, rely on 4c fuzzy matching + agent verification. This saves significant time on small files.
-
-> **GATE CHECK** (for files ≥50 lines): 4b and 4c are DIFFERENT checks. BOTH are mandatory, in order.
-> - **4b** = per-section semantic comparison → MISSING / PARTIAL / REVERSED
-> - **4c** = safety net script fuzzy-match → only TRUE_MISSING
-> Do NOT skip 4b. Do NOT substitute 4b with 4c.
-
-**Step 1 — Pre-filter via Grep** (reduces agent load by ~60-80%):
-
-1. For each `## ` section in the sorted file, collect all non-empty content lines.
-2. For each line, extract 2-3 unique keywords (prefer proper nouns, numbers, technical terms).
-   - **For lines with URLs**: extract domain/path as keyword (e.g., from `https://t.me/foo/123` → `foo/123`; from `https://github.com/user/repo` → `repo`).
-   - **For lines containing ONLY a URL**: grep by domain+path fragment.
-3. `Grep` each keyword in the rewritten file.
-4. If ANY grep finds the meaning of the line → mark COVERED, skip.
-5. If NO grep finds the line → add to the UNFOUND list for that section.
-
-Example:
-- Sorted line: `Автоматизация отработки фандингов https://t.me/automaker_main/43`
-- Keywords: `фандинг`, `automaker`
-- Grep `automaker` in rewritten → found at line 85 → COVERED, skip.
+### Phase 4 gap-detection rigor
 
-**Step 2 — Spawn agents for sections with unfound lines**:
-
-Assign 1-2 sections (by headers) per agent (only sections with remaining unfound lines after Step 1). No limit on agent count.
-
-- `subagent_type`: `Explore`
-- `run_in_background`: true
-
-**Agent prompt** (use this for each agent, replacing SECTIONS and FILE_PATHS):
-
-```
-You are a gap detector. Compare SORTED file vs REWRITTEN file for these sections: [SECTIONS].
-
-Files:
-- Sorted: [SORTED_PATH]
-- Rewritten: [REWRITTEN_PATH]
+❌ **Wrong:** File under 50 lines — skip Phase 4b entirely, trust 4c fuzzy-match alone.
+- 4c only emits TRUE_MISSING. PARTIAL and REVERSED are not caught.
+- In multi-file mode, if every source is under 50 lines, all three checks effectively degrade.
 
-CRITICAL: Use Grep tool to search for key phrases from each sorted line. Do NOT rely on manual reading for large files. For each line, grep 3-5 unique words in the rewritten file.
-
-IMPORTANT: The rewritten file may contain HTML blocks (<details>, <summary>, <table>).
-Content inside these tags IS valid — search INSIDE them with Grep. A line found inside
-<details>...</details> counts as present.
-
-For EACH non-empty line in your assigned sections of the SORTED file:
-1. Search for a semantic equivalent in the REWRITTEN file (search the ENTIRE file, not just the same section)
-2. If found with same meaning → SKIP
-3. If found but details lost → PARTIAL (quote both lines + what was lost)
-4. If meaning changed/reversed → REVERSED (quote both lines)
-5. If NOT found anywhere → MISSING (quote the sorted line)
-
-RULES:
-- Grammar/formatting changes are NOT gaps. "setup nginx" → "Set up Nginx" is fine.
-- PARTIAL only when a SPECIFIC IDEA, DETAIL, or CONTEXT is lost — not formatting.
-- These are NOT gaps: bullet→checkbox, case changes, typo fixes, punctuation, link text changes.
-- If the core idea and all details are preserved, it's a SKIP regardless of formatting.
-- You MUST quote exact text from both files. If you cannot quote the rewritten equivalent — it IS missing.
-- Output format per finding:
-  SECTION: <header>
-  TYPE: MISSING|PARTIAL|REVERSED
-  SORTED_LINE: "<exact quote>"
-  REWRITTEN_LINE: "<exact quote or NOT_FOUND>"
-  LOST_DETAIL: "<what was lost>" (PARTIAL only)
-```
+✅ **Right:** Skip 4b only in single-file mode with <50 lines. In multi-file mode, 4b ALWAYS runs, minimum 1 agent per source. Per-source keyword grep is strictly scoped to the source's own line range.
 
-**4b is complete when**: All section agents have returned results. Now proceed to 4c.
+### Standalone framing
 
-#### 4c: Coverage safety net (script + agent verification)
+❌ **Wrong:** Phase 9 report ends with `Recommend: /clear then /clarify <file>`. That's a presupposition — the user might be going to `mattpocock:tdd`, to a goal feature, or nowhere at all.
 
-**Step 1**: Run the coverage script:
-```bash
-python3 scripts/verify-coverage.py <sorted> <rewritten> <gaps>
-```
+✅ **Right:** End with one line: `Cleanup done. Run /clear before continuing.` Don't recommend downstream skills. The user decides what's next.
 
-The script checks every sorted line against rewritten (fuzzy match) and gaps. Lines not found → written to `<basename>.uncovered.tmp`.
+## Roles
 
-**Step 2**: If uncovered candidates exist, split into batches of 100 lines. Spawn one agent per batch in parallel. **No limit on agent count** — use as many as needed. NEVER skip this step.
+The skill spawns subagents in Phase 4 and Phase 10. Prompt templates:
 
-- `subagent_type`: `Explore`
-- Each agent reads its batch from `.uncovered.tmp`, plus the rewritten file
-- For each candidate, the agent determines: is this truly missing from rewritten, or just rephrased/reformatted?
+- `roles/gap-detector.md` — Phase 4b semantic compare per section
+- `roles/coverage-verifier.md` — Phase 4c and Phase 8 fuzzy-match verification
+- `roles/split-planner.md` — Phase 10 split plan (optional)
 
-**Agent prompt**:
-```
-You are a coverage verifier. You have a list of lines that a fuzzy-matching script
-could not find in the rewritten file. Many of these are FALSE POSITIVES — the content
-IS in the rewritten file but was rephrased, reformatted, or had typos fixed.
+Substitutions:
 
-IMPORTANT: The rewritten file may use <details><summary>...</summary>...</details> blocks.
-Content inside these blocks IS present — search the raw file text, not rendered output.
-Many false positives come from content moved into <details> blocks.
+| Variable | Source |
+|---|---|
+| `{sorted_path}`, `{rewritten_path}` | Phase 1-3 output |
+| `{sections}` | per-agent assignment (1-2 sections) |
+| `{uncovered_tmp_path}` | Phase 4c/8 script output |
+| `{source_kind}` | `sorted` (4c) / `backup` (8) |
+| `{mode}` | `strict` (default, batches of 100) / `loose` (Phase 8 optimization) |
+| `{cleaned_path}`, `{total_lines}`, `{section_list}` | Phase 10 input |
 
-CHAT SUMMARIZATION RULE: The rewritten file intentionally summarizes raw chat logs
-(timestamped messages like "☀️, [date]") into structured "Key takeaways" sections.
-If a chat message's substantive facts (numbers, prices, names, conclusions) appear
-in summarized form — it is COVERED, not MISSING. Specifically:
-- Timestamps, emoji markers, informal greetings → always FALSE POSITIVE
-- Conversational fragments ("Ну хз", "Ага", "Потом конечная") → FALSE POSITIVE
-- Back-and-forth debate condensed to conclusion → COVERED
-- Specific numbers/facts preserved in summary → COVERED
-Only report TRUE_MISSING if the substantive IDEA has no equivalent anywhere in the file.
+Spawn: `Agent(subagent_type="Explore", run_in_background=true, prompt=substitute("roles/<role>.md", vars))`.
 
-Files:
-- Uncovered candidates: [UNCOVERED_TMP_PATH]
-- Rewritten: [REWRITTEN_PATH]
+## What the skill does (step by step)
 
-For EACH line in the uncovered file:
-1. Search the ENTIRE rewritten file for content with the same meaning
-2. If found (even rephrased, reformatted, typo-fixed, summarized) → FALSE POSITIVE, skip it
-3. If truly NOT found anywhere → TRUE MISSING, report it
+Each input file goes through these steps independently. Multi-file means N parallel pipelines.
 
-Output ONLY the TRUE MISSING lines, one per line, with format:
-TRUE_MISSING: "<exact line from uncovered file>"
+1. **Understand the input.** Single or multi-file. Validate it's markdown. Backup every source (`<file>.bak`).
+2. **Sort sections.** Semantic sort: parse `## ` sections, move misplaced lines to the correct sections WITHOUT rewriting. Preserve every original line byte-for-byte. (Unicode caveat: the Write tool may normalize non-breaking spaces — if `verify-sort` fails, use Python for a byte-level copy.)
+3. **Verify sort.** `python3 scripts/verify-sort.py <bak> <sorted>` — superset check. FAIL → restore and abort.
+4. **Rewrite cleanly.** Fix grammar, dedupe exact copies, restructure with `### ` subsections, clean chat artifacts (timestamps, emoji) into "Key takeaways" blocks. Preserve every IDEA. Output: `<basename>.rewritten.<ext>`. Do not use `<details>`/`<summary>` for critical content (gap detection can see inside, but less reliably).
+5. **Find what was lost.** Three-level gap detection — details in `references/gap-detection.md`. Short version: 4a script (URLs only) + 4b per-section semantic agents + 4c fuzzy coverage net. All three are mandatory and ordered. Output: `<basename>.gaps.md`.
+6. **Pause — show gaps to the user.** Emit a report, wait for the "ready" signal. If `gaps_count == 0` → skip the wait and jump straight to step 8.
+7. **Apply decisions.** Read the edited gaps file. `[MISSING]`/`[UNCOVERED]` → insert. `[PARTIAL]` → augment. `[REVERSED]` → fix. Delete the gaps file.
+8. **Final compare against the original.** `python3 scripts/verify-coverage.py <bak> <basename>.rewritten.<ext> /dev/null` against the ORIGINAL backup, not sorted (different surfaces). Uncovered → spawn coverage-verifier agents (see `references/gap-detection.md` for strict vs loose mode). If everything is clean → `mv <basename>.rewritten <file>`, the original is replaced, `.bak` remains.
+9. **Report.** Per-source metrics plus aggregate. Multi-file: list every cleaned output.
+10. **Optional: split.** If a single output is >100 lines AND contains multiple distinct topics — offer to split into `spec-<slug>.md` + `references-<slug>.md`. See `references/split-mode.md` (Phase 10-12 detail).
 
-If all lines are false positives, output: "ALL COVERED — no true gaps found."
-```
-
-**Step 3**: Only TRUE MISSING lines from the agent get added to the gaps file as `[UNCOVERED]`. Delete the `.uncovered.tmp` file.
-
-### Phase 5: Gaps File
-
-1. Wait for all background agents to complete.
-2. Merge results from script (4a) + agents (4b).
-3. Write initial `<basename>.gaps.md`.
-4. Run coverage check (4c) — script finds candidates, agent verifies, only true gaps added.
-5. Delete `.uncovered.tmp`.
-6. Deduplicate.
-
-**Gaps file format:**
-
-```markdown
-# Gaps: <filename>
-<!-- Delete lines you don't need. Keep lines to apply to rewritten. -->
-<!-- Summary: N MISSING, M PARTIAL, K REVERSED, L UNCOVERED -->
-
-## <Section Name>
-
-- [MISSING] `<exact sorted line>`
-- [PARTIAL] `<sorted line>` → rewritten: `<rewritten line>` | Lost: <detail>
-- [REVERSED] `<sorted line>` → rewritten: `<rewritten line>`
-- [UNCOVERED] `<sorted line>`
-```
-
-### Phase 5.5: Auto-continue check
-
-**IF gaps_count == 0** (no MISSING, PARTIAL, REVERSED, or UNCOVERED items):
-→ Delete the empty gaps file.
-→ Output: "No gaps found. Skipping to final verification."
-→ Jump to **Phase 8** (Final Verification).
-
-**ELSE** → continue to Phase 6.
-
-### Phase 6: PAUSE
-
-Output a report:
-
-```
-=== CLEANUP COMPLETE (Phases 1-5) ===
-
-Files:
-  Backup:    <path>.bak          (<N> lines)
-  Sorted:    <path>              (<N> lines, verified)
-  Rewritten: <path>.rewritten    (<N> lines)
-  Gaps:      <path>.gaps.md      (<N> items: X missing, Y partial, Z reversed, W uncovered)
-
-Next: edit .gaps.md, delete what you don't need. Write me when you're ready to continue. 
-```
+Process details — in `references/gap-detection.md` and `references/split-mode.md`. Subagent prompts — in `roles/`.
 
-**STOP. Do not continue until the user indicates they are ready.**
+## Outputs
 
-### Phase 7: Apply
+Per source (multi-file → multiply by N):
+- `<source>.bak` — untouched copy of the original
+- `<source>` — final sorted + rewritten + gap-applied (the original is overwritten after step 8)
+- `<source>.gaps.md` — exists only while gaps remain, deleted after step 7/8
+- Optional (if split ran): `<basename>/spec-*.md`, `<basename>/references-*.md`
 
-When the user indicates they are ready:
+Git: two commits per source — `pre-cleanup: <name>` (snapshot) and `cleanup: rewrite <name>` (after step 9).
 
-1. Read the edited gaps file.
-2. For each remaining item:
-   - `[MISSING]` / `[UNCOVERED]` → insert the original line into the appropriate section in rewritten.
-   - `[PARTIAL]` → augment the rewritten line with the lost detail.
-   - `[REVERSED]` → fix the meaning in rewritten.
-3. Delete the gaps file.
-4. Output: "Applied N items. Final: <path>.rewritten (<N> lines)"
-
-### Phase 8: Final Verification
-
-Verify the final rewritten file against the original backup:
-
-```bash
-# All URLs from original present in final?
-python3 scripts/verify-rewrite.py <file>.bak <basename>.rewritten.<ext>
-
-# Every original line covered in final?
-python3 scripts/verify-coverage.py <file>.bak <basename>.rewritten.<ext> /dev/null
-```
-
-- If uncovered candidates found → **MANDATORY**: spawn NEW agents (batches of 100).
-  Do NOT reuse Phase 4c results — Phase 4c compared **sorted → rewritten**,
-  Phase 8 compares **backup (original) → rewritten**. Different source = different gaps.
-  **Optimization**: Если Phase 4c не выявила TRUE_MISSING items, И sorted файл
-  отличается от backup только добавленными `## ` headers (что проверено в Phase 2),
-  то допустимо запустить 1 агент на ВЕСЬ список uncovered (вместо батчей по 100),
-  с инструкцией "expect mostly false positives, report only truly unique content".
-  Use this prompt:
-  ```
-  You are a final coverage verifier. Lines from the ORIGINAL BACKUP were not fuzzy-matched
-  in the FINAL rewritten file. Many are FALSE POSITIVES (rephrased, reformatted, reorganized).
-
-  IMPORTANT: The rewritten file may contain <details>, <summary> and other HTML elements.
-  Content inside these tags IS present — search inside them.
-
-  CHAT SUMMARIZATION RULE: The rewritten file intentionally summarizes raw chat logs
-  (timestamped messages like "☀️, [date]") into structured "Key takeaways" sections.
-  If a chat message's substantive facts (numbers, prices, names, conclusions) appear
-  in summarized form — it is COVERED, not MISSING. Specifically:
-  - Timestamps, emoji markers, informal greetings → always FALSE POSITIVE
-  - Conversational fragments → FALSE POSITIVE
-  - Back-and-forth debate condensed to conclusion → COVERED
-  - Specific numbers/facts preserved in summary → COVERED
-  Only report TRUE_MISSING if the substantive IDEA has no equivalent anywhere.
-
-  Files:
-  - Uncovered candidates: [UNCOVERED_TMP_PATH]
-  - Final rewritten: [REWRITTEN_PATH]
-
-  For EACH line:
-  1. Search ENTIRE rewritten file for same meaning
-  2. Found (even rephrased, inside <details>, summarized) → FALSE POSITIVE, skip
-  3. Truly not found → TRUE MISSING
-
-  Output: TRUE_MISSING: "<exact line>" or "ALL COVERED — no true gaps found."
-  ```
-- If TRUE MISSING found → report them, DO NOT replace original, DO NOT delete backup.
-- If all clear:
-  1. **Auto-replace**: `mv <file>.rewritten <file>` — original is replaced, `.bak` stays as backup.
-  2. Delete the gaps file if it exists.
-  3. Output: "✅ Final verification passed. Original replaced. Backup: <file>.bak"
-
-### Phase 9: Report
-
-Output a final report:
-
-```
-=== CLEANUP REPORT ===
-
-Metrics:
-  Original:  <N> lines
-  Rewritten: <N> lines (<ratio>% compression)
-  Gaps found: <N> (X applied, Y dismissed by user)
-  URLs: <N> original, <M> preserved, <K> missing (user-approved)
-  Original replaced: yes/no
-  Backup: <path>.bak
-
-Issues encountered:
-- <any verification failures, skipped steps, agent errors, or anomalies>
-
-Fixes (brief, only if issues found):
-- <concrete action to resolve each issue>
-
-Recommendations:
-- <suggestions for the file or future rewrites>
-```
-
----
-
-## Phase B: Split (optional)
-
-After Phase 9 Report, offer to split the cleaned file into structured spec + reference files.
-
-### Phase 10: Split Analysis (plan mode)
-
-1. Analyze the clean file for distinct topics/projects.
-2. **IF** single topic OR file has <100 lines → skip split, suggest clarify:
-   ```
-   "File is focused on a single topic. Recommend: /compact then /clarify <file>"
-   ```
-3. **IF** multiple distinct topics found → **enter plan mode** (EnterPlanMode):
-   - Write a split plan to the plan file with:
-     - List of output files with names and descriptions
-     - For each file: which sections/line ranges go there
-     - Cross-reference strategy (which specs link to which references)
-     - Estimated line counts per file
-   - Plan format:
-     ```markdown
-     # Split Plan: <filename>
-     
-     ## Output files
-     
-     ### spec-<topic-A>.md (~N lines)
-     Sections: <list of ## headers going here>
-     Content: <brief description>
-     
-     ### references-<topic-A>.md (~M lines)
-     Sections: <list of ## headers going here>
-     Content: links, research, external refs related to topic A
-     
-     ### spec-<topic-B>.md (~K lines)
-     ...
-     
-     ## Cross-references
-     - spec-<A>.md → references-<A>.md
-     - spec-<B>.md → references-<B>.md
-     ```
-   - Exit plan mode (ExitPlanMode) — user reviews and approves.
-   - If user rejects → ask what to change, revise plan, re-submit.
-   - If user approves → proceed to Phase 11.
-
-### Phase 11: Execute Split
-
-1. Create output directory: `<basename>/` (sibling to input file).
-2. Follow the approved plan — for each file:
-   - `spec-<topic-slug>.md` — main content (tasks, goals, requirements, decisions).
-   - `references-<topic-slug>.md` — links, research notes, external refs, raw data.
-3. Add cross-references at top of each spec:
-   ```markdown
-   > References: [references-<topic>.md](references-<topic>.md)
-   ```
-4. Preserve every original line exactly as-is in one of the output files.
-
-### Phase 12: Verify Split
-
-```bash
-python3 scripts/verify-split.py <original-clean-file> <output-dir>
-```
-
-The script concatenates all `.md` files in output dir and checks that every line from the original is present (fuzzy match). New lines (navigation headers, cross-references) are OK.
-
-- If FAIL → report uncovered lines. Do NOT delete original.
-- If PASS → continue.
-
-### Phase 13: Handoff
-
-```
-=== SPLIT COMPLETE ===
-
-Files:
-  <list of created files with line counts>
-
-Recommend: /clear then /clarify <spec-file.md>
-```
-
-Use `/clear` (not `/compact`) — clarify works best with a fresh context window, especially when split produced multiple specs that will each get their own clarify cycle.
-
----
-
-## Scaling
-
-The skill must handle files of any size. Scale resources proportionally:
-- Phase 4b (semantic check): 1 agent per 1-2 sections. No limit on agent count. Skip for files <50 lines.
-- Phase 4c (coverage): batch uncovered into groups of 100. 1 agent per batch. No limit.
-- Phase 8 (final): same scaling as Phase 4c (or 1 agent if Phase 4c was clean — see optimization).
-Never skip a verification step due to file size or token cost.
+## Connections to other skills
+
+- **Input:** typically a raw file from notes/chat. Can be invoked standalone, or after `/extract` if the notes contain URLs.
+- **Output:** valid sectioned markdown without unresolved markers. What to do with it is the user's call (manual edit, `/clarify`, `mattpocock:to-prd`, direct goal-feature input, etc.).
+- **Does not call** other skills automatically. After step 9: `Cleanup done. Run /clear before continuing.` — no downstream recommendation.
 
 ## Rules
 
-- Act immediately — no confirmation needed (except Phase 6 pause and Phase 10 split question).
-- Match the user's language in all output.
-- If any phase fails — report the error, restore from backup if needed, and stop.
-- **Git commits** (if git initialized):
-  - **Before start**: `git add <input-files> && git commit -m "pre-cleanup: <filename>"` — snapshot before any changes
-  - **After Phase 9**: `cleanup: rewrite <filename>`
-  - **After Phase 12**: `cleanup: split <filename> into <N> files`
+### Commonality
+The pipeline is preservation-first because the next steps (clarify, manual edit, mattpocock) assume nothing was lost. If you let a dropped idea pass through Phase 4 as "probably unimportant", the next step works from a holey map. That is not "helping faster" — it is breaking the shared work.
 
-## Output Contract
+### Prior commitment
+In step 3 (verify sort) you committed to running the superset check. In step 5 — all three gap-detection levels. In step 8 — the final compare against backup. Skipping any step withdraws the basis for the final verdict. Not "optimization" — contract violation.
 
-The cleanup output is suitable as input for `/clarify`. The output file MUST:
-- Be a valid markdown file
-- Have `## ` section headers for all major topics
-- Contain no unresolved markers (`[MISSING]`, `[PARTIAL]`, `[REVERSED]`, `[UNCOVERED]`)
-- If split was performed: each `spec-*.md` file is an independent clarify input
+### Authority (multi-file)
+Multi-file mode was split into N independent pipelines specifically because merged concatenation lost provenance and masked gaps. If you concatenate "for simplicity" in multi-file mode, you are reintroducing the bug this skill was rewritten to fix.
 
-## Scripts
+## Self-check before delivering the result
 
-All scripts are in `scripts/` (plugin root) or `~/.claude/skills/cleanup/scripts/` (legacy):
+Would this document pass review by a senior engineer who has to build the system from it? Concretely:
 
-| Script | Purpose | Args |
-|--------|---------|------|
-| `verify-sort.py` | Superset check — all original lines preserved, new lines OK | `<backup> <sorted>` |
-| `verify-rewrite.py` | URL presence check (with normalization) | `<source> <target>` |
-| `verify-coverage.py` | Safety net — every line accounted for | `<sorted> <rewritten> <gaps>` |
-| `verify-split.py` | Split verification — all lines present across output files | `<original> <output-dir>` |
+- Every `## ` section in the right place; no fragments "stuck in the wrong place"?
+- No `[MISSING]`/`[PARTIAL]`/`[REVERSED]`/`[UNCOVERED]` markers left?
+- In multi-file mode — N output files, not one merged?
+- `verify-coverage.py` against backup passed with TRUE_MISSING = 0?
+- Backup files (`.bak`) in place — there's a path to roll back?
+
+If "no" on any item — redo, don't ship.

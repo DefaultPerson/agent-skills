@@ -1,79 +1,73 @@
-# agent-workflow
+# agent-skills
 
-Spec-driven development pipeline for AI coding agents. Turn messy notes into shipped code — autonomously.
-
-Built on the [harness pattern](https://www.anthropic.com/engineering/harness-design-long-running-apps): state on disk, deterministic verification, graceful recovery from context limits.
+Three focused skills for the pre-implementation half of an AI coding workflow: losslessly reorganize messy notes, pull content out of links, decompose specs into atomic tasks with verifiable acceptance criteria.
 
 ## The Flow
 
 ```
- ┌────────┐  cleanup  ┌────────┐  clarify  ┌────────┐  execute  ┌────────┐  verify
- │ notes  ├──────────>│  spec  ├──────────>│tasks+AC├──────────>│  code  ├─────────> PASS/FAIL
- │ ideas  │           │ sorted │    ▲      │proof   │           │commits │
- │ chat   │           │verified│    │      │[P]marks│           │per task│
- └────────┘           └────────┘ approval  └────────┘           └───┬────┘
-                                   gate               worktree      │
-                                                      agents     ◄──┘ fix loop
-                                                               (max 3 rounds)
+ ┌────────┐  cleanup  ┌──────────┐  extract  ┌────────────┐  clarify  ┌─────────┐    →   mattpocock:tdd
+ │ notes  ├──────────>│  clean   ├──────────>│ clean with ├──────────>│ atomic  │    →   Claude Code goal feature
+ │  with  │           │ markdown │           │  offline   │           │ tasks + │    →   manual implementation
+ │ links  │           │ document │           │  content   │           │ AC with │    →   claude -p for AC verify
+ └────────┘           └──────────┘           └────────────┘           │  proof  │
+                                                                     │commands │
+                                                                     └─────────┘
+                                                                          ▲
+                                                                          │
+                                                              Codex+Claude consensus
+                                                                (Phase 7.6 in clarify)
 ```
 
-All commands use the `workflow:` prefix:
+## Skills
 
-- **workflow:cleanup** — sort, rewrite, 3-level gap detection, 100% content preservation. Split into spec + references.
-- **workflow:clarify** — tasks with Given/When/Then AC, proof commands, [P]arallel markers, execution order. Approval gate.
-- **workflow:execute** — parallel worktree agents per [P] task. Each task = one commit. Auto-verify + fix loop (max 3).
-- **workflow:verify** — fresh context, zero builder narrative. Run every proof command, report PASS/FAIL/UNKNOWN.
-- **workflow:autoresearch** — autonomous optimization loop. One atomic change per iteration: commit → measure → keep or revert.
-- **workflow:ralph-loop** — autonomous execution across context limits. Stop hook blocks exit until completion promise.
-- **workflow:cancel-ralph** — abort active ralph loop.
+- **`/cleanup`** — losslessly reorganize a messy notes/plan/chat dump into a clean sectioned markdown file. Three-level gap detection (deterministic URL check + per-section semantic agents + fuzzy coverage net) proves nothing was lost. Multi-file input → multi-file output (per-source pipelines, not merged).
+- **`/extract`** — pull content out of every URL in a notes file (YouTube subtitles via yt-dlp, public Telegram via embed-page scrape, HTML via pandoc/curl). Replaces each URL with a local pointer, preserves originals, gitignores extracted content.
+- **`/clarify`** — turn a clean spec into an implementation-ready document: atomic tasks with Given/When/Then acceptance criteria, shell-runnable proof commands, contracts (FR-NNN with MUST/SHOULD/MAY), edge cases, risks. Cross-model consensus loop with Codex (optional) catches issues single-model self-review misses.
+
+Each skill follows the same template — `description` states triggers and tradeoffs (not algorithm), honest weakness section up front, ❌/✅ contrast pairs, "letter = spirit" canon, Cialdini-framed rules, senior-review self-check before output.
 
 ## Example
 
 ```bash
-/workflow:cleanup notes.md chat-export.md ideas.md
+# 1. Reorganize the chaos into a clean sectioned doc with proven coverage
+#    (nothing dropped, every URL preserved).
+/cleanup research-notes.md
+
+# 2. Pull content out of every URL in the cleaned doc (YouTube transcripts,
+#    Telegram posts, articles). Original URLs stay; pointers to local copies
+#    appear next to each one.
+/extract research-notes.md
+
+# 3. Decompose into atomic tasks with verifiable AC. Phase 7.6 invokes
+#    codex:adversarial-review (from openai/codex-plugin-cc, if installed)
+#    against the uncommitted spec edit and iterates up to 3 rounds until
+#    consensus.
+/clarify research-notes.md
 ```
-
-Sort semantically, rewrite into clean markdown, 3-level gap detection — **zero content loss**.
-
-```bash
-/workflow:clarify spec.md
-```
-
-Decompose into atomic tasks with acceptance criteria. Approval gate — nothing runs without your OK.
-
-```bash
-/workflow:execute spec.md
-```
-
-Parallel worktree agents, commit per task, auto-verify. ralph-loop activates automatically for large specs.
-
-```bash
-/workflow:verify spec.md
-```
-
-Independent verification — fresh context, runs every proof command.
 
 ## Installation
 
-### Claude Code
-
 ```bash
-/plugin marketplace add DefaultPerson/agent-workflow
-/plugin install agent-workflow@agent-workflow
+/plugin marketplace add DefaultPerson/agent-skills
+/plugin install agent-skills@agent-skills
 ```
 
-ralph-loop is included — long-running execution works out of the box.
-
-### Codex CLI
+Optional (for `/clarify` Phase 7.6 cross-model consensus): install the [Codex CLI](https://github.com/openai/codex) and the [Codex plugin for Claude Code](https://github.com/openai/codex-plugin-cc):
 
 ```bash
-git clone https://github.com/DefaultPerson/agent-workflow.git
-cp -r agent-workflow/skills-codex/* ~/.codex/skills/
+/plugin marketplace add openai/codex-plugin-cc
+/plugin install codex@openai-codex
 ```
+
+The plugin provides the `codex:adversarial-review` skill that clarify drives during its consensus loop. Without the plugin (or when the spec isn't in a git repo, since adversarial-review operates on the working tree), `/clarify` falls back to single-model internal validation with a warning.
 
 ## Prerequisites
 
-Git, `gh` CLI (authenticated), Python 3.10+.
+- **Required:** Git, `bash`, `jq`, `python3`.
+- **`/extract` deps** (probed at runtime, install prompt if missing): `yt-dlp` (YouTube subtitles), `pandoc` (HTML — optional, falls back to crude curl). Telegram works with just `curl`.
+- **`/clarify` Phase 7.6 optional:** [Codex CLI](https://github.com/openai/codex) + [codex-plugin-cc](https://github.com/openai/codex-plugin-cc) (provides `codex:adversarial-review`). Spec must live in a git repo for working-tree review; otherwise the loop falls back to internal validation.
+
+Release history: see [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

@@ -1,380 +1,248 @@
 ---
 name: clarify
 description: >
-  Enrich a spec with tasks, acceptance criteria, edge cases, and implementation order.
-  Makes any spec implementation-ready for batch execution.
-  Triggers: "clarify", "/clarify", "уточни спеку", "enrich spec",
-  "обогати спеку", "decompose spec"
-allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, WebSearch, WebFetch]
+  Use when you have a clean spec/notes file that needs to be made
+  implementation-ready: decomposed into atomic tasks with verifiable
+  acceptance criteria (Given/When/Then + shell proof commands),
+  constraints, edge cases, and risk surface. Output is suitable for
+  human implementation, mattpocock:tdd, or Claude Code goal feature.
+  Tradeoff: slow and thorough — overkill for tasks under 1 hour. For
+  freeform PRD use mattpocock:to-prd instead. Triggers: "clarify",
+  "/clarify", "уточни спеку", "enrich spec", "обогати спеку",
+  "decompose spec".
+when_to_use: >
+  The input is a cleaned-up markdown spec/notes file (probably after
+  /cleanup) that captures the WHAT but not the HOW. You want to turn it
+  into atomic tasks with shell-verifiable AC before handing to a builder
+  (human, mattpocock:tdd, or goal feature). Do NOT use for raw chat
+  exports (run /cleanup first), for already-decomposed specs, or for
+  product-management-style PRDs (mattpocock:to-prd is better suited).
+allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, AskUserQuestion, WebSearch, WebFetch]
 ---
 
-# Clarify Skill
+# Clarify
 
-Enrich a spec into an implementation-ready document with tasks, acceptance criteria, edge cases, contracts, and execution order.
+Turn a clean spec into an implementation-ready document with atomic tasks, verifiable acceptance criteria, contracts, edge cases, and risks.
+
+> **Letter = spirit.** If a rule blocks you from reaching the goal it was
+> written for, the rule is wrong, not the goal. Don't look for a wording
+> loophole — ask what the rule is protecting, and protect that.
 
 ## Usage
 
 ```
-/clarify <spec file>
+/clarify <spec.md> [--consensus-rounds N]
 ```
 
-## Algorithm
+`--consensus-rounds` defaults to 3. Set it to 0 to skip the cross-model consensus loop (Phase 7.6) — only internal validation runs.
 
-$ARGUMENTS
+## Weaknesses and when NOT to use
 
-Arguments: `<spec file>`
+- **Slow and thorough — overkill for hour-long tasks.** Decomposition + AC + edge cases + 3 consensus rounds (if codex is available) take 10-15 minutes. For smaller tasks, write the AC by hand.
+- **Does not work on raw chat exports or unstructured notes.** The input spec must already be sectioned with `## ` (after `/cleanup`). Otherwise — abort.
+- **Not suited for product-style PRDs.** This skill forces test-first AC with proof commands; for product-management PRDs use `mattpocock:to-prd` (freeform success metrics).
+- **Phase 7.6 consensus loop requires the codex CLI.** Without it — fallback to internal validation (a single model reviewing its own output, weaker).
+- **Not for autonomous orchestration.** The output has no `[P]` markers, Stages, or dependency graphs — the execute pipeline was removed from this repo in v2.0. Output is for `mattpocock:tdd` or manual work.
 
-### Phase 1: Read & Analyze
+## How to do it wrong vs right
 
-1. **Validate**: If no argument — ask for file path (AskUserQuestion).
-2. **Read** the spec file completely.
-2.5. **Input validation**: Check spec is a valid clarify input:
-   - Must be a markdown file (`.md` extension)
-   - Must have at least one `## ` section header
-   - Must not contain unresolved cleanup markers (`[MISSING]`, `[PARTIAL]`, `[REVERSED]`, `[UNCOVERED]`)
-   - If markers found → abort: "Spec contains unresolved cleanup gaps. Run /cleanup first or remove markers."
-3. **Identify**: project type, tech stack, scope, existing structure.
-4. **Scan codebase** (if project directory exists):
-   - Existing code, tests, configs, dependencies.
-   - Use Glob/Grep to understand the current state.
-5. **Scope check**: If spec describes multiple independent subsystems — flag immediately.
-   - Decompose into sub-specs BEFORE continuing.
-   - Each sub-spec gets its own clarify cycle.
-6. **Classify spec type** (auto-detect, do NOT ask user):
-   - **product** — has end users, features, UI/UX. Signals: "user", "customer", "page", "form", "dashboard", "API endpoint for users".
-   - **technical** — infra, migrations, refactoring, tooling, CLI. Signals: "migrate", "refactor", "setup", "deploy", "config", "CI/CD", "monitoring", "optimize".
-   - **small** — <5 tasks expected OR spec is <30 lines OR describes a single focused change.
-   This classification drives format choices in Phases 3-5. State the detected type in output.
-7. **Mark unknowns**: flag anything unclear with `[NEEDS CLARIFICATION]`.
+### AC format
 
-### Phase 2: Clarifying Questions
+❌ **Wrong:** `AC-1.1: API returns correct response`
+- "Correct" — who decides?
+- No proof command
+- Boolean (works / doesn't) — no UNKNOWN
 
-**Hard gate**: Do NOT proceed to decomposition until unclear points are resolved.
+✅ **Right:** `AC-1.1: GET /api/users returns 200, JSON with {id,name,email}, <200ms`
+- Concrete numbers and fields
+- Proof: `curl -w '%{time_total}' localhost:8080/api/users | jq '.[].id'`
+- Tristate: PASS / FAIL / UNKNOWN (when the server isn't running)
 
-- Generate up to 5 questions about unclear points.
-- Present **one question at a time**, prefer multiple choice with a recommended option:
-  ```
-  **Q1**: What auth method should the API use?
-  
-  **Recommended**: B — JWT tokens (stateless, standard for REST APIs)
-  
-  A. Session-based (server-side sessions)
-  B. JWT tokens (stateless)
-  C. API keys (simple, for internal services)
-  ```
-- Focus on:
-  - Ambiguous requirements (could be interpreted two ways?)
-  - Missing constraints (performance targets, scale, auth, persistence?)
-  - Priority conflicts (which feature matters most?)
-  - Items flagged `[NEEDS CLARIFICATION]` in Phase 1.
-- **IF spec is already clear** (no `[NEEDS CLARIFICATION]` flags, no ambiguity) → skip to Phase 3.
+### Task scope
 
-### Phase 3: Decompose into Tasks
+❌ **Wrong:** `TASK-1: Implement authentication system`
+- Touches many files
+- Multiple purposes mixed
+- Cannot be verified with a single command
 
-Decomposition adapts to **spec type** detected in Phase 1:
+✅ **Right:** `TASK-1: Create User model in src/models/user.py with email/password fields`
+- 1 file, clear boundaries
+- Atomic — one testable deliverable
+- AC: `python -c "from src.models.user import User; User(email='a@b', password='x')"` runs without errors
 
-**Product spec** → group by user story (US-N), each story = independently testable deliverable.
-**Technical spec** → group by concern area (AREA-N: "Database", "Auth", "Monitoring").
-**Small spec** → flat numbered list, no grouping.
+### Cross-model consensus disagreement
 
-**Task format (product):**
+❌ **Wrong:** Codex returns NEEDS_IMPROVEMENT with an issue "requirement X looks unusual, suggest removing it". I apply it — I remove it.
+- The user added the requirement on purpose.
+- Removing it "helped me faster" but stomped the user's intent.
 
-```markdown
-### TASK-{N}: {title} [P]
+✅ **Right:** Issue type = NEEDS_USER (either Codex flagged it that way itself, or Claude self-assessor reclassified). AskUserQuestion with both views. The user decides.
 
-**Story**: US-{M} — {story title}
-**Status**: todo
-**Depends on**: TASK-X, TASK-Y (or "none")
-**Files**: {exact paths to create/modify}
-**Leverage**: {existing code to reuse — paths to models, utils, patterns, or "none"}
-**Requirements**: {FR-001, FR-003 — which requirements this fulfills}
+## Roles
 
-**Acceptance Criteria**:
-- [ ] AC-{N}.1: {concrete, verifiable criterion}
-  Given: {initial state}
-  When: {action}
-  Then: {expected outcome}
-  Proof: `{exact command to verify}`
-- [ ] AC-{N}.2: ...
+Step 2 (questioner pattern) and the Phase 7.6 consensus loop (with fallback validator) — templates live in `roles/`:
 
-**Edge Cases**:
-- {boundary condition}: {expected behavior}
-- {error scenario}: {expected handling}
+- `roles/questioner.md` — format contract for AskUserQuestion in step 2 (not a subagent — a format spec)
+- `roles/codex-reviewer.md` — focus brief passed to `codex:adversarial-review` (from [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc)). NOT a full prompt — that command owns the adversarial role and JSON output schema.
+- `roles/claude-self-assessor.md` — Phase 7.6 Claude self-assessment in a fresh subprocess (`claude -p`), categorizes Codex findings as ACCEPT / REJECT_PETTY / NEEDS_USER
+- `roles/spec-validator.md` — fallback used inside Phase 7.6 when codex-plugin-cc is not installed
+
+Substitutions:
+
+| Variable | Source |
+|---|---|
+| `{spec_path}` | the spec file after step 6 (write) |
+| `{round}` | round counter in Phase 7.6 (1, 2, 3) |
+| `{spec_path}.bak` | original spec (pre-enrichment) for coverage check |
+| `{spec_path}.critique.<round>.json` | Codex JSON output per round |
+| `{focus_brief}` | text content of `roles/codex-reviewer.md` (passed verbatim as USER_FOCUS) |
+
+Invocations:
+- **Codex adversarial review:** `Skill(skill="codex:adversarial-review", args="--wait --scope working-tree \"{focus_brief}\"")`. Output is structured JSON with findings (file, line_start, line_end, confidence, recommendation). Working-tree scope reads the uncommitted spec edit directly.
+- **Claude self-assessment:** Bash subprocess `claude -p` with the prompt from `roles/claude-self-assessor.md` plus the Codex JSON pasted in.
+- **Fallback validator (no codex):** `Agent(subagent_type="Explore", prompt=substitute("roles/spec-validator.md", vars))`.
+
+## What the skill does (step by step)
+
+1. **Read and analyze the spec.** Validate (markdown, has `## ` headers, no cleanup markers `[MISSING]`/etc), classify type (product / technical / small), scan the codebase if present, flag `[NEEDS CLARIFICATION]` items.
+2. **Ask the user what's unclear** (hard gate). Max 5 questions via AskUserQuestion — format in `roles/questioner.md`. If the spec is already clear — skip.
+3. **Decompose into atomic tasks.** Format adapts to type — details in `references/task-format.md`. Main rule: each task touches 1-3 files, AC is Given/When/Then + a shell Proof command (NO `[P]` markers or Stages — execute is gone).
+4. **Define contracts** (FR-NNN format, MUST/SHOULD/MAY). Skip if the spec is small or single-component. Details in `references/contracts.md`.
+5. **Self-review checklist.** Placeholder scan, internal consistency, scope check, ambiguity check. Fixes — loop back to the relevant phase.
+6. **Write the enriched spec.** Back up the original (`<spec>.bak`), write enriched into the original path. Template structures: see `references/task-format.md`.
+7. **Mechanical validation.** `python3 scripts/verify-spec.py <spec>`. FAIL → fix and re-run.
+8. **Cross-model consensus loop (Phase 7.6).** Codex review + Claude self-assess, iterate until CONSENSUS or max rounds. Details — next section. Can be skipped with `--consensus-rounds 0`.
+9. **Approval gate.** Summary report + AskUserQuestion (Approve / Modify / Questions). After approval: `"Spec approved. /clear before continuing."` — no downstream recommendation.
+
+The old "Execution Order" section (Stages, [P] markers, dependency graph for parallel spawn) is GONE in v2.0. It existed for the execute orchestration, which no longer ships.
+
+## Phase 7.6 — Cross-model consensus loop
+
+After steps 6-7 (write enriched spec + verify-spec.py mechanical check), the convergence loop runs. Step 8 in the walkthrough is Phase 7.6.
+
+The loop drives `codex:adversarial-review` against the uncommitted spec edit, then has Claude (in a fresh `claude -p` subprocess) categorize the findings. Two independent passes per round — Codex finds, Claude triages.
+
+```
+MAX_ROUNDS = consensus_rounds_flag (default 3, 0 disables)
+round = 0
+focus_brief = read("roles/codex-reviewer.md")  # the focus block, not the whole file
+
+if not codex_plugin_installed:
+  log WARNING "codex-plugin-cc not installed; falling back to single-model validation"
+  result = Agent(subagent_type="Explore",
+                 prompt=substitute("roles/spec-validator.md",
+                                   {spec_path, spec_path_bak}))
+  → CONSENSUS or NEEDS_FIX (single round only)
+  goto Step 9 (approval gate)
+
+# Ensure spec is in working tree so adversarial-review can see it.
+# (Step 6 already wrote <spec>; do NOT commit yet — uncommitted edit is
+# exactly what working-tree scope is for.)
+
+while round < MAX_ROUNDS:
+  round += 1
+
+  # 1. Codex adversarial review via Claude Code skill invocation
+  findings_json = Skill(
+    skill="codex:adversarial-review",
+    args=f"--wait --scope working-tree \"{focus_brief}\""
+  )
+  save → <spec>.critique.<round>.json
+
+  # 2. Claude self-assessment in a fresh subprocess
+  assessment = bash: claude -p < (
+    read("roles/claude-self-assessor.md")
+    + "\n\nSpec file: " + spec_path
+    + "\n\nCodex findings:\n" + findings_json
+  )
+
+  # 3. Exit on consensus
+  if findings_json.summary == "approve" and assessment.verdict == AGREE_PASS:
+    → CONSENSUS, exit loop
+
+  # 4. Process findings via assessment categorization
+  for each finding in findings_json.findings:
+    cat = assessment.categorization[finding.id]
+    if cat == ACCEPT: apply finding.recommendation to spec
+    elif cat == REJECT_PETTY: log to <spec>.critique.<round>.rejected.md
+    elif cat == NEEDS_USER: queue for AskUserQuestion
+
+  if NEEDS_USER queue not empty:
+    AskUserQuestion with the issues + both views
+    apply user decisions
+
+  # 5. Oscillation detection
+  if hash(findings_json.findings) == hash_round_minus_2:
+    → ESCALATE to user: "the models are stuck — your call"
+    break
+
+if round == MAX_ROUNDS and not CONSENSUS:
+  ESCALATE to user: "(A) approve as-is, (B) abort, (C) one more round"
 ```
 
-**Task format (technical):**
+Failure modes:
+- **codex-plugin-cc not installed** → fallback to `roles/spec-validator.md` (single-model), workflow continues with a warning.
+- **Spec not in a git repository** → `codex:adversarial-review --scope working-tree` requires git. If the spec lives outside any repo, also fall back to spec-validator.
+- **Models gang up on user intent** → `roles/codex-reviewer.md` focus brief explicitly forbids proposing removal of unusual requirements. `roles/claude-self-assessor.md` mirrors the rule when categorizing.
+- **Petty disagreements** → Codex shouldn't emit them (its `finding_bar` excludes style). If any leak through → REJECT_PETTY category, logged with reasoning, not applied.
+- **Oscillation** → hash comparison between rounds N and N-2, escalation.
 
-```markdown
-### TASK-{N}: {title} [P]
-
-**Area**: AREA-{M} — {concern area}
-**Status**: todo
-**Depends on**: TASK-X (or "none")
-**Files**: {exact paths}
-**Leverage**: {existing code to reuse, or "none"}
-
-**Acceptance Criteria**:
-- [ ] AC-{N}.1: {criterion}
-  Proof: `{command}`
-
-**Edge Cases**:
-- {relevant edge case only}
+Output schema reminder (from codex-plugin-cc's adversarial-review prompt):
+```json
+{
+  "summary": "needs-attention | approve",
+  "findings": [
+    {
+      "file": "<spec.md path>",
+      "line_start": <int>,
+      "line_end": <int>,
+      "confidence": <0..1>,
+      "recommendation": "<concrete change>"
+    }
+  ]
+}
 ```
 
-**Task format (small):**
+## Outputs
 
-```markdown
-### TASK-{N}: {title}
+- `<spec>.bak` — original before enrichment
+- `<spec>` — overwritten with enriched version
+- `<spec>.critique.1.json`, `<spec>.critique.2.json`, ... — Codex adversarial-review findings per round (if the consensus loop ran)
+- `<spec>.critique.<round>.rejected.md` — petty-issue rejections with reasoning (if any)
 
-**Files**: {paths}
-**Leverage**: {existing code, or "none"}
-**AC**: {criterion} — Proof: `{command}`
-```
+Git: `pre-clarify: <name>` (snapshot before) and `clarify: enrich <name>` (after step 6).
 
-**Task granularity examples:**
+## Connections to other skills
 
-BAD (too broad):
-- "Implement authentication system" — affects many files, multiple purposes
-- "Add user management" — vague scope, no file paths
-
-GOOD (atomic):
-- "Create User model in src/models/user.py with email/password fields"
-- "Add password hashing utility in src/utils/auth.py using bcrypt"
-- "Create LoginForm component in src/components/LoginForm.tsx"
-
-**Rules for acceptance criteria** (all spec types):
-- **Tristate status**: PASS | FAIL | UNKNOWN — never boolean.
-- **Concrete, not vague**: NOT "it works" → "GET /api/users returns 200; JSON has {id,name,email}; <200ms"
-- **Each AC independently verifiable** with a concrete proof command.
-- **Proof commands** must be runnable: `curl`, `pytest`, `ls`, `grep`, etc.
-
-**Rules for tasks** (all spec types):
-- **Atomic scope**: 1-3 related files per task.
-- **Single purpose**: one testable outcome per task.
-- `[P]` marker if task can run in parallel with others.
-- **Leverage field** required — forces the agent to look for reusable code.
-
-**Edge cases** — generate only RELEVANT categories per task (pick 2-3, not all 5):
-- **Input**: empty, null, oversized, unicode, special chars
-- **Boundaries**: min/max values, single element, empty collection
-- **Errors**: network failure, timeout, partial failure, invalid state
-- **Concurrency**: race conditions, duplicate processing
-- **Security**: auth bypass, injection, rate limiting
-
-### Phase 4: Contracts
-
-**Skip if**: small spec, OR single-component technical spec.
-
-Define interfaces between components:
-- **API endpoints**: method, path, request/response schema with types.
-- **Type definitions**: interfaces, structs, enums.
-- **Event contracts**: pub/sub topics, payload schemas.
-- Label each: `FR-{NNN}` (functional requirement, spec-kit format).
-- Use MUST/SHOULD/MAY for requirement levels:
-  ```
-  - FR-001: System MUST return 401 for unauthenticated requests
-  - FR-002: System SHOULD cache responses for 5 minutes
-  - FR-003: System MAY support batch operations in v2
-  ```
-
-### Phase 5: Execution Order
-
-Adapts to spec type:
-
-**Product spec:**
-```
-Phase 1 (Setup):      TASK-1 [serial] — scaffolding, deps
-Phase 2 (Foundation): TASK-2, TASK-3 [serial, blocks all] — core abstractions
-  Checkpoint: "Core types and interfaces defined"
-Phase 3 (Stories):    TASK-4 [P], TASK-5 [P], TASK-6 [P] — feature work
-  Checkpoint: "US-1, US-2, US-3 each independently functional"
-Phase 4 (Polish):     TASK-7, TASK-8 [serial] — integration, edge cases
-  Checkpoint: "All acceptance criteria passing"
-```
-
-**Technical spec:**
-```
-Phase 1 (Setup):        TASK-1 [serial] — prerequisites
-Phase 2 (Core Work):    TASK-2 [P], TASK-3 [P] — main changes
-  Checkpoint: "Core changes applied, tests passing"
-Phase 3 (Verification): TASK-4 [serial] — integration testing, validation
-```
-
-**Small spec:**
-```
-1. TASK-1
-2. TASK-2 (depends on TASK-1)
-3. TASK-3 [P with TASK-2]
-```
-
-- Build dependency graph from task `depends_on` fields.
-- `[P]` markers for parallelizable tasks.
-- **Checkpoints** between phases: concrete verification statement.
-- **Stages** (if project is large, product type):
-  - Stage 1 (MVP): core user stories only.
-  - Stage 2 (v1): full story set.
-  - Stage 3 (v2): optimization, polish.
-
-### Phase 6: Spec Self-Review + Validation
-
-**Step 1 — Self-review checklist** (before writing):
-
-1. **Placeholder scan**: any TBD, TODO, "...", `[NEEDS CLARIFICATION]`, incomplete sections?
-2. **Internal consistency**: do tasks match overview? do AC match task descriptions? do contracts match API tasks?
-3. **Scope check**: focused enough for a single execution cycle? or needs further decomposition?
-4. **Ambiguity check**: could any AC be interpreted two ways? could any task description mean two different things?
-
-Fix any issues found. Loop back to relevant phase if needed.
-
-**Step 2 — Write spec** (Phase 7), then run mechanical validation:
-
-```bash
-python3 scripts/verify-spec.py <spec-file>
-```
-
-If FAIL → fix the reported issues and re-run.
-
-**Step 3 — Validation subagent** (after verify-spec.py PASS):
-
-Spawn an Explore agent:
-```
-You are a spec validator. Read the enriched spec at [PATH].
-Check:
-1. Template compliance — all required sections present (Overview, Constraints, Tasks, Execution Order)
-2. Task quality — each task is atomic (1-3 files), has concrete AC with proof commands
-3. Consistency — tasks match overview, AC match task descriptions
-4. Coverage — all items from Overview have corresponding tasks
-5. No placeholders — no TBD, TODO, "...", vague descriptions
-
-Rate: PASS | NEEDS_IMPROVEMENT | MAJOR_ISSUES
-If not PASS — list specific issues with section references.
-```
-
-- **PASS** → proceed to Phase 8 (Approval).
-- **NEEDS_IMPROVEMENT** → auto-fix issues, re-run verify-spec.py, re-validate.
-- **MAJOR_ISSUES** → show issues to user, ask for guidance.
-
-### Phase 7: Write Enriched Spec
-
-1. **Backup** original: `cp <spec> <spec>.bak`
-2. **Write** enriched spec to the original file.
-3. **Run verify-spec.py** and validation subagent (Phase 6 Steps 2-3).
-
-**Structure (product spec):**
-
-```markdown
-# {Project Name}
-
-## Overview
-{original spec content, preserved and cleaned up}
-
-## Constraints
-- {technical constraints}
-- {performance constraints}
-- {scope constraints}
-
-## Non-goals
-- {what is explicitly NOT being built}
-- {what is deferred to future stages}
-
-## User Stories
-### US-1: {title}
-{description, acceptance scenarios}
-
-## Tasks
-{all tasks with AC, grouped by story}
-
-## Contracts
-{API/type definitions — if multi-component}
-
-## Execution Order
-{phase-based plan with [P] markers and checkpoints}
-
-## Risks
-**High:** {risk}: mitigation: {strategy}
-**Medium:** {risk}: mitigation: {strategy}
-
-## Stages
-{MVP → v1 → v2 — if large project}
-
-## References
-{links to reference files}
-```
-
-**Structure (technical spec):**
-
-```markdown
-# {Project Name}
-
-## Overview
-{original spec content}
-
-## Constraints
-## Non-goals
-
-## Tasks
-{grouped by concern area}
-
-## Execution Order
-{Setup → Core Work → Verification}
-
-## Risks
-```
-
-**Structure (small spec):**
-
-```markdown
-# {Title}
-
-## Overview
-## Constraints
-## Tasks
-{flat numbered list}
-```
-
-### Phase 8: Approval
-
-**Hard gate** — no implementation without explicit approval.
-
-Present summary:
-```
-=== CLARIFY COMPLETE ===
-
-Spec: <path>
-Stories: N user stories
-Tasks: M tasks (K parallelizable)
-Acceptance Criteria: P total (Q with proof commands)
-Edge Cases: R documented
-Contracts: S functional requirements
-Stages: T (if applicable)
-
-Backup: <path>.bak
-```
-
-Ask user (AskUserQuestion):
-```
-Spec enriched. Review and approve, or request changes?
-
-Options:
-A. Approve — proceed to execution
-B. Modify — specify which sections to change
-C. Questions — ask me anything about the spec
-```
-
-- **IF Modify** → iterate on specific sections, re-run Phase 6 self-review.
-- **IF Approve** → output:
-  ```
-  Spec approved. Recommend: /clear then /execute <spec.md>
-  ```
+- **Input:** typically after `/cleanup` (sectioned markdown without `[MISSING]` markers). A manually written spec is also fine if it's structurally valid.
+- **Output:** enriched spec with AC + proof commands, suitable for:
+  - mattpocock:tdd (test-first implementation)
+  - Claude Code goal feature (for measurable success criteria)
+  - manual implementation
+  - independent `claude -p` verify for AC checks after implementation
+- **Does not call** other skills automatically. After step 9 (approval): `Spec approved. /clear before continuing.` — no recommendation.
+- **Cross-model dependency:** Phase 7.6 uses `codex:adversarial-review` from [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) if installed and the spec is in a git repo. Without it — graceful fallback to `roles/spec-validator.md`.
 
 ## Rules
 
-- Act immediately — no confirmation needed except Phase 2 questions and Phase 8 approval.
-- Match the user's language in all output.
-- Preserve ALL original spec content — enrich, don't replace.
-- If spec references existing code — read and verify before writing tasks.
-- Each AC MUST have a concrete proof command. No exceptions.
-- **Git commits** (if git initialized):
-  - **Before start**: `git add <spec-file> && git commit -m "pre-clarify: <filename>"` — snapshot before enrichment
-  - **After Phase 7**: `clarify: enrich <spec-filename>`
-- If any phase reveals the spec needs fundamental rework — report to user, don't force-enrich a broken spec.
+### Commonality
+The spec is a shared artifact. Downstream work (mattpocock:tdd, goal feature, manual builder) makes decisions from it. If you let a placeholder through, leave a vague AC, or fail to resolve a contradictory FR — the next step works from a holey map. Not "helping faster" — breaking the shared work.
+
+### Prior commitment
+In step 5 (self-review) you committed to running placeholder scan + consistency + ambiguity check. In step 7 — `verify-spec.py`. In step 8 — the consensus loop (or fallback). Skipping any step withdraws the basis for the final verdict the user is going to act on.
+
+### Social proof (cross-model rationale)
+Phase 7.6 exists because single-model self-review is weaker. Per consensus research (AltimateAI/claude-consensus, ARIS — adversarial cross-model review), an independent second model catches issues the first biases past. If you "skip" Phase 7.6 when codex is present, you remove the only real basis to trust the spec beyond "Claude approved its own output".
+
+## Self-check before delivering the result
+
+Would this spec pass review by a senior engineer who has to build the system from it? Concretely:
+
+- Does every AC have a concrete proof command (not "it works", not "manual check")?
+- No placeholders (`TBD`, `...`, `[NEEDS CLARIFICATION]`, `<insert here>`)?
+- Is every task atomic — 1-3 files, single purpose, executable by an independent worker without questions to the author?
+- Did Phase 7.6 pass (or was it explicitly skipped with reasoning)?
+- Coverage: does every Overview item have at least one task? Does every task track back to Overview / FR?
+- Backup `<spec>.bak` exists — the user can roll back?
+
+If "no" on any item — redo, don't ship.
