@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.3
+
+### Fixed
+
+- **`/clarify` Phase 7.6 invocation of Codex adversarial review.** Previous versions called `Skill(skill="codex:adversarial-review", ...)`, which the Skill tool silently refuses because the slash command has `disable-model-invocation: true` in its frontmatter — it's a user-only command. Symptom: clarify reported "codex-plugin-cc not installed" and fell back to single-model validation, even when the plugin was installed and `/codex:adversarial-review` worked perfectly when the user typed it manually. Fix: detect the plugin by filesystem probe (`ls ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`) and invoke the underlying node script directly via Bash (`node <path> adversarial-review --wait --scope working-tree "<focus_brief>"`). The script itself has no model-invocation restriction. SKILL.md weakness/failure-mode sections updated to explicitly call out this trap so future maintainers don't reintroduce it.
+
 ## 2.0.2
 
 ### Changed

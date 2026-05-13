@@ -41,7 +41,7 @@ Turn a clean spec into an implementation-ready document with atomic tasks, verif
 - **Slow and thorough — overkill for hour-long tasks.** Decomposition + AC + edge cases + 3 consensus rounds (if codex is available) take 10-15 minutes. For smaller tasks, write the AC by hand.
 - **Does not work on raw chat exports or unstructured notes.** The input spec must already be sectioned with `## ` (after `/cleanup`). Otherwise — abort.
 - **Not suited for product-style PRDs.** This skill forces test-first AC with proof commands; for product-management PRDs use `mattpocock:to-prd` (freeform success metrics).
-- **Phase 7.6 consensus loop requires `codex-plugin-cc` installed in Claude Code** — i.e. the `codex:adversarial-review` skill must be invocable via the `Skill` tool. The bare `codex` CLI alone is not enough; it's a transitive dependency of the plugin, not the entry point this skill uses. Without the plugin — fallback to internal validation (a single model reviewing its own output, weaker).
+- **Phase 7.6 consensus loop requires `codex-plugin-cc` installed in Claude Code.** The skill detects it via a filesystem probe (`ls $HOME/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`) and invokes `node <path> adversarial-review ...` directly via Bash. It does NOT go through the `Skill` tool — the `codex:adversarial-review` slash command has `disable-model-invocation: true` and is only callable when the user types it manually. The bare `codex` CLI alone is also not enough; it's a transitive dependency of the plugin, not the entry point this skill uses. Without the plugin — fallback to internal validation (a single model reviewing its own output, weaker).
 - **Not for autonomous orchestration.** The output has no `[P]` markers, Stages, or dependency graphs — the execute pipeline was removed from this repo in v2.0. Output is for `mattpocock:tdd` or manual work.
 
 ## How to do it wrong vs right
@@ -97,7 +97,13 @@ Substitutions:
 | `{focus_brief}` | text content of `roles/codex-reviewer.md` (passed verbatim as USER_FOCUS) |
 
 Invocations:
-- **Codex adversarial review:** `Skill(skill="codex:adversarial-review", args="--wait --scope working-tree \"{focus_brief}\"")`. Output is structured JSON with findings (file, line_start, line_end, confidence, recommendation). Working-tree scope reads the uncommitted spec edit directly.
+- **Codex adversarial review:** call the codex-companion script **directly via Bash** — NOT via `Skill(skill="codex:adversarial-review", ...)`. The slash-command wrapper has `disable-model-invocation: true` in its frontmatter, so the `Skill` tool refuses to invoke it from inside another skill; only the user typing `/codex:adversarial-review` works that way. The script itself has no such restriction. Resolve the path once and reuse:
+  ```bash
+  COMPANION="$(ls -t "$HOME/.claude/plugins/cache/openai-codex/codex/"*"/scripts/codex-companion.mjs" 2>/dev/null | head -1)"
+  [ -n "$COMPANION" ] && [ -f "$COMPANION" ] || echo "codex-plugin-cc not installed"
+  node "$COMPANION" adversarial-review --wait --scope working-tree "$FOCUS_BRIEF"
+  ```
+  Output is structured JSON with findings (file, line_start, line_end, confidence, recommendation). Working-tree scope reads the uncommitted spec edit directly.
 - **Claude self-assessment:** Bash subprocess `claude -p` with the prompt from `roles/claude-self-assessor.md` plus the Codex JSON pasted in.
 - **Fallback validator (no codex):** `Agent(subagent_type="Explore", prompt=substitute("roles/spec-validator.md", vars))`.
 
@@ -131,7 +137,13 @@ MAX_ROUNDS = consensus_rounds_flag (default 3, 0 disables)
 round = 0
 focus_brief = read("roles/codex-reviewer.md")  # the focus block, not the whole file
 
-if not codex_plugin_installed:
+# Detect codex-plugin-cc by probing for the companion script on disk.
+# Do NOT rely on the Skill tool seeing `codex:adversarial-review` — it
+# won't, the slash command has disable-model-invocation: true.
+COMPANION = bash:
+  ls -t "$HOME/.claude/plugins/cache/openai-codex/codex/"*"/scripts/codex-companion.mjs" 2>/dev/null | head -1
+
+if COMPANION is empty or not a file:
   log WARNING "codex-plugin-cc not installed; falling back to single-model validation"
   result = Agent(subagent_type="Explore",
                  prompt=substitute("roles/spec-validator.md",
@@ -148,11 +160,12 @@ rounds = []   # in-memory history: [{findings, assessment, applied, rejected, es
 while round < MAX_ROUNDS:
   round += 1
 
-  # 1. Codex adversarial review via Claude Code skill invocation
-  findings_json = Skill(
-    skill="codex:adversarial-review",
-    args=f"--wait --scope working-tree \"{focus_brief}\""
-  )
+  # 1. Codex adversarial review via direct Bash invocation of the
+  #    codex-companion script. The Skill tool cannot call
+  #    `codex:adversarial-review` (disable-model-invocation: true on the
+  #    slash command); the underlying node script has no such restriction.
+  findings_json = bash:
+    node "$COMPANION" adversarial-review --wait --scope working-tree "$focus_brief"
 
   # 2. Claude self-assessment in a fresh subprocess
   assessment = bash: claude -p < (
@@ -196,8 +209,9 @@ if round == MAX_ROUNDS and not CONSENSUS:
 ```
 
 Failure modes:
-- **codex-plugin-cc not installed** → fallback to `roles/spec-validator.md` (single-model), workflow continues with a warning.
-- **Spec not in a git repository** → `codex:adversarial-review --scope working-tree` requires git. If the spec lives outside any repo, also fall back to spec-validator.
+- **codex-plugin-cc not installed** → fallback to `roles/spec-validator.md` (single-model), workflow continues with a warning. Detection is via `ls`-probe of `~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`, NOT via the Skill-tool registry — the slash command is invisible to the model anyway.
+- **Skill tool reports `codex:adversarial-review` as unavailable** → expected behaviour, not a real failure. The slash command has `disable-model-invocation: true`, so the Skill tool refuses to call it from inside another skill. The direct Bash invocation of `codex-companion.mjs` bypasses this entirely. If your detection step says "plugin missing" while `/codex:adversarial-review` works for the user manually, you're checking the wrong thing — re-read the Invocations section.
+- **Spec not in a git repository** → `adversarial-review --scope working-tree` requires git. If the spec lives outside any repo, also fall back to spec-validator.
 - **Models gang up on user intent** → `roles/codex-reviewer.md` focus brief explicitly forbids proposing removal of unusual requirements. `roles/claude-self-assessor.md` mirrors the rule when categorizing.
 - **Petty disagreements** → Codex shouldn't emit them (its `finding_bar` excludes style). If any leak through → REJECT_PETTY category, logged with reasoning, not applied.
 - **Oscillation** → hash comparison between rounds N and N-2, escalation.
