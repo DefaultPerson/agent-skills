@@ -6,13 +6,13 @@ This is Phase 7.6 in the clarify pipeline. Codex has finished its review and emi
 
 ## Inputs
 
-- **Spec file:** `{spec_path}`
-- **Codex critique:** `{spec_path}.critique.<round>.md`
+- **Spec file:** `{spec_path}` (path on disk — read it)
+- **Codex critique:** appended to this prompt as JSON below the marker line `Codex findings:` (the orchestrator pipes it via stdin — there is NO critique file on disk)
 - **Round:** `{round}`
 
 ## What to do
 
-Read the spec, read the critique. For every issue in the critique:
+Read the spec from disk. Read the Codex findings JSON from the prompt body. For every issue in the findings array:
 
 1. **Substantive issue?** If the problem is real (e.g. AC without proof command, missing edge case, inconsistent dependency) → **ACCEPT**.
 2. **Style/petty issue?** If Codex is complaining about style, formatting, word choice, section ordering, or markdown syntax → **REJECT_PETTY** (with reasoning).
@@ -57,8 +57,8 @@ After categorizing every issue:
   "verdict": "AGREE_PASS | DISAGREE_NEEDS_FIX | CALL_USER",
   "categorization": [
     {
-      "issue_id": "<index in critique>",
-      "section": "<from critique>",
+      "issue_id": "<index in the findings array>",
+      "section": "<file:line_start-line_end from the finding>",
       "category": "ACCEPT | REJECT_PETTY | NEEDS_USER",
       "reasoning": "<one sentence why this category>"
     }
@@ -74,7 +74,7 @@ After categorizing every issue:
 ❌ Agreeing with all Codex issues to reduce work — REJECT_PETTY exists exactly for this.
 ❌ Rejecting a substantive issue as "petty" to avoid revision — violation of the only contract this role has.
 ❌ Silently applying what Codex proposed without explicit categorization.
-❌ Categorizing without reading the spec — you MUST read the spec, not just the critique.
+❌ Categorizing without reading the spec — you MUST read the spec from disk, not just the findings JSON.
 
 ## Prior commitment
 

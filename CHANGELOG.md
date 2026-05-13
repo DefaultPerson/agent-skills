@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.1
+
+Hardening pass on the v2.0 trio. No breaking API; behaviour changes only inside `/extract` output layout and `/clarify` consensus-loop hygiene.
+
+### Changed
+
+- **`/extract` output is now one shared `extracted/` parent per directory.** Previously each note produced its own sibling `<note>.extracted/`, so processing N notes in a directory left N folders cluttering it. New layout: `<note-dir>/extracted/<note-basename>/<slug>/...` — N notes consolidate under one `extracted/` umbrella. `.gitignore` pattern simplified from `*.extracted/` to `extracted/`.
+- **`/extract` URL triage step (new Phase 2).** Heuristic-classifies bare hosts, `docs.*` subdomains and path roots, GitHub repo roots, package-registry landings, and anchor-only URLs as `reference`. A single AskUserQuestion surfaces them with three options (skip all / extract all / pick which); default is skip. Stops noise URLs (API docs, citation links, tool homepages) from polluting the output. Final report enumerates four states: `extracted` / `error` / `skipped(reference)` / `skipped(user)`.
+- **`/clarify` Phase 7.6 no longer writes `<spec>.critique.<N>.json` or `<spec>.critique.<N>.rejected.md`.** Codex findings and round-by-round breakdowns live in memory during the loop and are printed to stdout at round boundaries. On consensus failure or oscillation, the full round log is dumped to stdout before user escalation. The two `.bak` and `<spec>` files are the only on-disk artifacts now.
+- **`/clarify` clarified that Phase 7.6 depends on `codex-plugin-cc` (the Claude Code skill), not the bare `codex` CLI.** The CLI is a transitive dependency of the plugin, not the entry point this skill uses. Fallback to `roles/spec-validator.md` triggers when the plugin is missing (not when the CLI is).
+- **`/clarify` Connections section no longer recommends downstream skills.** Removed the `mattpocock:tdd / Claude Code goal feature / manual implementation / claude -p verify` bullet list; downstream choices belong to the user, not the skill. The "Does not call other skills automatically" sentence remains.
+
 ## 2.0.0
 
 Breaking release — removes the orchestration skills, slims `/clarify`, adds `/extract`, fixes `/cleanup` multi-file handling.
@@ -27,4 +39,5 @@ Breaking release — removes the orchestration skills, slims `/clarify`, adds `/
   - Public Telegram via embed-page scrape (no auth required)
   - Generic HTML via `pandoc` (falls back to crude curl strip if pandoc missing)
   - Interactive prompt for "other" URLs (custom command escape hatch)
-  - Annotates each successful URL in the source note with a local pointer; preserves originals; gitignores the `*.extracted/` output.
+  - **URL triage** — heuristic-classifies bare hosts, `docs.*`, GitHub repo roots, package-registry landings, and anchor-only URLs as `reference`; surfaces them in a single AskUserQuestion before extraction begins. Default = skip all references; escape hatches: extract all, or pick which. Stops noise URLs (API docs, citation links, tool homepages) from polluting `extracted/`.
+  - Annotates each successful URL in the source note with a local pointer; preserves originals; gitignores the `extracted/` output (one shared parent per directory, per-note subfolder inside — multi-file runs in the same dir consolidate, not proliferate).

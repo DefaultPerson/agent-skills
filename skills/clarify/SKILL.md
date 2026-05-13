@@ -41,7 +41,7 @@ Turn a clean spec into an implementation-ready document with atomic tasks, verif
 - **Slow and thorough — overkill for hour-long tasks.** Decomposition + AC + edge cases + 3 consensus rounds (if codex is available) take 10-15 minutes. For smaller tasks, write the AC by hand.
 - **Does not work on raw chat exports or unstructured notes.** The input spec must already be sectioned with `## ` (after `/cleanup`). Otherwise — abort.
 - **Not suited for product-style PRDs.** This skill forces test-first AC with proof commands; for product-management PRDs use `mattpocock:to-prd` (freeform success metrics).
-- **Phase 7.6 consensus loop requires the codex CLI.** Without it — fallback to internal validation (a single model reviewing its own output, weaker).
+- **Phase 7.6 consensus loop requires `codex-plugin-cc` installed in Claude Code** — i.e. the `codex:adversarial-review` skill must be invocable via the `Skill` tool. The bare `codex` CLI alone is not enough; it's a transitive dependency of the plugin, not the entry point this skill uses. Without the plugin — fallback to internal validation (a single model reviewing its own output, weaker).
 - **Not for autonomous orchestration.** The output has no `[P]` markers, Stages, or dependency graphs — the execute pipeline was removed from this repo in v2.0. Output is for `mattpocock:tdd` or manual work.
 
 ## How to do it wrong vs right
@@ -94,7 +94,6 @@ Substitutions:
 | `{spec_path}` | the spec file after step 6 (write) |
 | `{round}` | round counter in Phase 7.6 (1, 2, 3) |
 | `{spec_path}.bak` | original spec (pre-enrichment) for coverage check |
-| `{spec_path}.critique.<round>.json` | Codex JSON output per round |
 | `{focus_brief}` | text content of `roles/codex-reviewer.md` (passed verbatim as USER_FOCUS) |
 
 Invocations:
@@ -139,6 +138,8 @@ if not codex_plugin_installed:
 # (Step 6 already wrote <spec>; do NOT commit yet — uncommitted edit is
 # exactly what working-tree scope is for.)
 
+rounds = []   # in-memory history: [{findings, assessment, applied, rejected, escalated}]
+
 while round < MAX_ROUNDS:
   round += 1
 
@@ -147,7 +148,6 @@ while round < MAX_ROUNDS:
     skill="codex:adversarial-review",
     args=f"--wait --scope working-tree \"{focus_brief}\""
   )
-  save → <spec>.critique.<round>.json
 
   # 2. Claude self-assessment in a fresh subprocess
   assessment = bash: claude -p < (
@@ -161,23 +161,33 @@ while round < MAX_ROUNDS:
     → CONSENSUS, exit loop
 
   # 4. Process findings via assessment categorization
+  applied, rejected, needs_user = [], [], []
   for each finding in findings_json.findings:
     cat = assessment.categorization[finding.id]
-    if cat == ACCEPT: apply finding.recommendation to spec
-    elif cat == REJECT_PETTY: log to <spec>.critique.<round>.rejected.md
-    elif cat == NEEDS_USER: queue for AskUserQuestion
+    if cat == ACCEPT:
+      apply finding.recommendation to spec
+      applied.append(finding)
+    elif cat == REJECT_PETTY:
+      rejected.append((finding, reason))   # printed to stdout in the round summary
+    elif cat == NEEDS_USER:
+      needs_user.append(finding)
 
-  if NEEDS_USER queue not empty:
+  print round summary: N applied, M rejected (with reasons), K queued for user
+  rounds.append({findings_json, assessment, applied, rejected, needs_user})
+
+  if needs_user not empty:
     AskUserQuestion with the issues + both views
     apply user decisions
 
   # 5. Oscillation detection
-  if hash(findings_json.findings) == hash_round_minus_2:
+  if hash(findings_json.findings) == rounds[-3].findings_hash:
     → ESCALATE to user: "the models are stuck — your call"
+    print full rounds[] summary to stdout
     break
 
 if round == MAX_ROUNDS and not CONSENSUS:
   ESCALATE to user: "(A) approve as-is, (B) abort, (C) one more round"
+  print full rounds[] summary to stdout
 ```
 
 Failure modes:
@@ -207,20 +217,16 @@ Output schema reminder (from codex-plugin-cc's adversarial-review prompt):
 
 - `<spec>.bak` — original before enrichment
 - `<spec>` — overwritten with enriched version
-- `<spec>.critique.1.json`, `<spec>.critique.2.json`, ... — Codex adversarial-review findings per round (if the consensus loop ran)
-- `<spec>.critique.<round>.rejected.md` — petty-issue rejections with reasoning (if any)
 
 Git: `pre-clarify: <name>` (snapshot before) and `clarify: enrich <name>` (after step 6).
+
+Phase 7.6 internals (Codex findings per round, applied/rejected/escalated breakdown) live in memory and are printed to stdout at round boundaries — no critique files written. If consensus fails or oscillates, the full round-by-round summary is dumped to stdout before user escalation, so the user can decide based on the actual exchange.
 
 ## Connections to other skills
 
 - **Input:** typically after `/cleanup` (sectioned markdown without `[MISSING]` markers). A manually written spec is also fine if it's structurally valid.
-- **Output:** enriched spec with AC + proof commands, suitable for:
-  - mattpocock:tdd (test-first implementation)
-  - Claude Code goal feature (for measurable success criteria)
-  - manual implementation
-  - independent `claude -p` verify for AC checks after implementation
-- **Does not call** other skills automatically. After step 9 (approval): `Spec approved. /clear before continuing.` — no recommendation.
+- **Output:** enriched spec with AC + proof commands. The skill stops here — downstream choices (test-first build, manual work, independent AC verification) belong to the user, not to the skill.
+- **Does not call** other skills automatically. After step 9 (approval): `Spec approved. /clear before continuing.` — no next-step suggestion.
 - **Cross-model dependency:** Phase 7.6 uses `codex:adversarial-review` from [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) if installed and the spec is in a git repo. Without it — graceful fallback to `roles/spec-validator.md`.
 
 ## Rules

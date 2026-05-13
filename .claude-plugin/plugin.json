@@ -1,5 +1,5 @@
 {
   "name": "agent-skills",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Notes cleanup + spec enrichment (AC+proof commands) + URL extraction. Pairs with mattpocock/skills for implementation."
 }
