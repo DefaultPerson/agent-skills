@@ -78,6 +78,14 @@ Turn a clean spec into an implementation-ready document with atomic tasks, verif
 
 ✅ **Right:** Issue type = NEEDS_USER (either Codex flagged it that way itself, or Claude self-assessor reclassified). AskUserQuestion with both views. The user decides.
 
+### Implicit scope reduction
+
+❌ **Wrong:** Input spec mentions "batch user creation" and "admin role for DELETE". Mid-decomposition I think "those feel like v2 territory" — I mark them `MAY (deferred to v2)` and move on. Same for "rate limiting" which I drop into a `Non-goals` section without asking.
+- The user wrote those into the input on purpose. Marking them v2 silently is the same as deleting a user-stated requirement.
+- Down-stream builder sees `MAY` and skips them. The user finds out only when they read the final spec and realise three things they wanted are gone.
+
+✅ **Right:** Step 5 has a hard-gate "Scope-cut audit". Anything that ends up tagged `MAY` + `(v2)/(future)/(deferred)/(later)/(stretch)/(MVP only)`, or goes into `Non-goals`, or drops an input-mentioned feature/edge-case — gets surfaced via batched AskUserQuestion **before** the enriched spec is written to disk. Per item: `Keep deferred` / `Include in v1` / `Drop entirely`. Nothing gets quietly downgraded.
+
 ## Roles
 
 Step 2 (questioner pattern) and the Phase 7.6 consensus loop (with fallback validator) — templates live in `roles/`:
@@ -121,7 +129,12 @@ print(matches[-1] if matches else json.dumps({"summary":"approve","findings":[]}
 2. **Ask the user what's unclear** (hard gate). Max 5 questions via AskUserQuestion — format in `roles/questioner.md`. If the spec is already clear — skip.
 3. **Decompose into atomic tasks.** Format adapts to type — details in `references/task-format.md`. Main rule: each task touches 1-3 files, AC is Given/When/Then + a shell Proof command (NO `[P]` markers or Stages — execute is gone).
 4. **Define contracts** (FR-NNN format, MUST/SHOULD/MAY). Skip if the spec is small or single-component. Details in `references/contracts.md`.
-5. **Self-review checklist.** Placeholder scan, internal consistency, scope check, ambiguity check. Fixes — loop back to the relevant phase.
+5. **Self-review checklist.** Placeholder scan, internal consistency, ambiguity check, and a **hard-gate Scope-cut audit (user-facing)**. The audit scans the in-memory enriched spec for deferral signals:
+   - FR-NNN entries marked `MAY` with phrases `(v2)`, `(future)`, `(deferred)`, `(later)`, `(stretch goal)`, `(MVP only)`, `(out of scope for now)`, `(not for now)`.
+   - Items in a `Non-goals` section that map back to anything mentioned in the input.
+   - Features / endpoints / edge cases present in the input that have no backing task or were silently dropped from a task's coverage.
+   
+   If any signal is found, surface a batched AskUserQuestion (multiSelect=false, one question per item, up to 4 per call — batch into multiple calls if more) with the options `Keep deferred (current)` / `Include in v1` / `Drop entirely`. Apply user decisions to the in-memory spec. Loop back to step 3/4 if scope changes require re-decomposition. NEVER write to disk while scope cuts are unconfirmed. If the audit finds nothing — gate silently passes.
 6. **Write the enriched spec.** Back up the original (`<spec>.bak`), write enriched into the original path. Template structures: see `references/task-format.md`.
 7. **Mechanical validation.** `python3 scripts/verify-spec.py <spec>`. FAIL → fix and re-run.
 8. **Cross-model consensus loop (Phase 7.6).** Codex review + Claude self-assess, iterate until CONSENSUS or max rounds. Details — next section. Can be skipped with `--consensus-rounds 0`.
@@ -257,7 +270,10 @@ Phase 7.6 internals (Codex findings per round, applied/rejected/escalated breakd
 The spec is a shared artifact. Downstream work (mattpocock:tdd, goal feature, manual builder) makes decisions from it. If you let a placeholder through, leave a vague AC, or fail to resolve a contradictory FR — the next step works from a holey map. Not "helping faster" — breaking the shared work.
 
 ### Prior commitment
-In step 5 (self-review) you committed to running placeholder scan + consistency + ambiguity check. In step 7 — `verify-spec.py`. In step 8 — the consensus loop (or fallback). Skipping any step withdraws the basis for the final verdict the user is going to act on.
+In step 5 (self-review) you committed to running placeholder scan + consistency + ambiguity check + **Scope-cut audit (user-facing gate)**. In step 7 — `verify-spec.py`. In step 8 — the consensus loop (or fallback). Skipping any step withdraws the basis for the final verdict the user is going to act on.
+
+### Authority (scope decisions belong to the user)
+Marking a requirement `MAY (v2)`, moving a feature into `Non-goals`, or dropping an edge case from a task's coverage — these are scope decisions. They are NOT cleanup, simplification, or "spec hygiene". The user wrote the input on purpose; deciding what's in v1 vs deferred is theirs, not yours. The Scope-cut audit in step 5 is a hard user-facing gate precisely so the model never makes this call alone. "It looks unconventional" / "v2 would be cleaner" / "the user probably didn't mean it" are not valid reasons to silently downgrade something — surface it instead.
 
 ### Social proof (cross-model rationale)
 Phase 7.6 exists because single-model self-review is weaker. Per consensus research (AltimateAI/claude-consensus, ARIS — adversarial cross-model review), an independent second model catches issues the first biases past. If you "skip" Phase 7.6 when codex is present, you remove the only real basis to trust the spec beyond "Claude approved its own output".
@@ -268,6 +284,7 @@ Would this spec pass review by a senior engineer who has to build the system fro
 
 - Does every AC have a concrete proof command (not "it works", not "manual check")?
 - No placeholders (`TBD`, `...`, `[NEEDS CLARIFICATION]`, `<insert here>`)?
+- **Was the step 5 Scope-cut audit run, with every detected deferral (`MAY (v2)`, `Non-goals` items, dropped input features/edge cases) confirmed by the user via AskUserQuestion?** No silent v2-tagging.
 - Is every task atomic — 1-3 files, single purpose, executable by an independent worker without questions to the author?
 - Did Phase 7.6 pass (or was it explicitly skipped with reasoning)?
 - Coverage: does every Overview item have at least one task? Does every task track back to Overview / FR?

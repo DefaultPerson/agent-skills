@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.2.0
+
+`/clarify` no longer makes scope decisions on its own. Step 5 now has a hard user-facing gate.
+
+### Added
+
+- **Step 5 "Scope-cut audit" — hard gate before the enriched spec is written to disk.** Scans the in-memory spec for deferral signals: FRs marked `MAY` with phrases `(v2)` / `(future)` / `(deferred)` / `(later)` / `(stretch goal)` / `(MVP only)`, items in a `Non-goals` section that map back to anything in the input, and features / endpoints / edge cases mentioned in the input that got silently dropped from task coverage. For every signal found, surfaces a batched AskUserQuestion (multiSelect false, up to 4 items per call, batched if more) with per-item options `Keep deferred` / `Include in v1` / `Drop entirely`. Apply user decisions before writing. If the audit finds nothing — gate silently passes.
+
+### Changed
+
+- **`How to do it wrong vs right` got a fourth pair: "Implicit scope reduction"** — concrete failure mode (batch user creation + admin DELETE silently tagged `MAY (v2)`) paired with the audit-gate fix.
+- **`Rules` section adds Authority entry: "scope decisions belong to the user".** The model never silently demotes an input-mentioned requirement to deferred. "Looks unconventional" / "v2 would be cleaner" / "user probably didn't mean it" are not valid reasons.
+- **`references/contracts.md` got a hard-rule callout** stating that `MAY + (vN)` / `(deferred)` requires user confirmation via the step 5 audit — never silent.
+- **Self-check bullet added:** "Was the step 5 Scope-cut audit run, with every detected deferral confirmed by the user via AskUserQuestion?" Senior-review check now blocks silent v2-tagging.
+- **Prior commitment rule mentions the audit** as a step-5 contract, not just placeholder/consistency/ambiguity.
+
+### Why
+
+Recurring user pain: `/clarify` would mark requirements as `MAY (v2)` or move features into `Non-goals` without asking. From the model's POV it felt like "clean spec hygiene"; from the user's POV it was silent deletion of intent. Scope cuts are a user decision, not a documentation choice. The audit makes that explicit in the workflow rather than relying on prompt discipline alone.
+
 ## 2.1.0
 
 `/clarify` Phase 7.6 now talks to the `codex` CLI directly. The `codex-plugin-cc` Claude Code plugin is no longer a dependency.

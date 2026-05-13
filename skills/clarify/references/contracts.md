@@ -27,6 +27,8 @@ Every contract item gets the label `FR-{NNN}` (spec-kit convention):
 
 Use them precisely — don't write "should" when you mean "MUST". If it's required — MUST.
 
+> **Scope-cut user gate (hard rule).** An FR getting `MAY` paired with `(v2)` / `(future)` / `(deferred)` / `(later)` / `(stretch goal)` / `(MVP only)` is a scope decision, not a documentation choice. Such an entry MUST be confirmed by the user via the step 5 Scope-cut audit before the spec is written to disk. The model never silently demotes an input-mentioned requirement to deferred — the user opted into the input on purpose; opting things out is theirs.
+
 ## Example: REST API contract
 
 ```markdown

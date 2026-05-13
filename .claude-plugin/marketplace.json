@@ -8,7 +8,7 @@
       "name": "agent-skills",
       "source": "./",
       "description": "Notes cleanup + spec enrichment with verifiable AC + URL extraction (YouTube/Telegram/HTML). Companion to mattpocock/skills.",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "category": "development",
       "keywords": ["cleanup", "clarify", "spec", "extract", "notes", "youtube", "telegram"]
     }
