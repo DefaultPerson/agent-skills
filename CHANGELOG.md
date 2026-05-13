@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.1.0
+
+`/clarify` Phase 7.6 now talks to the `codex` CLI directly. The `codex-plugin-cc` Claude Code plugin is no longer a dependency.
+
+### Changed
+
+- **Phase 7.6 invocation switched from `codex-plugin-cc` to `codex review --uncommitted`.** The codex CLI exposes a stable, public `review` subcommand that takes a custom prompt and a target. We pass `roles/codex-reviewer.md` as the full prompt and `--uncommitted` as the scope (which covers the just-written enriched spec, staged or unstaged). Output is parsed by extracting the last fenced JSON code block — schema is enforced by the prompt itself. The full `codex-plugin-cc` plugin (~5100 lines of plugin runtime, app-server broker, background-jobs infrastructure) is no longer needed.
+- **`roles/codex-reviewer.md` rewritten as a standalone prompt.** Previously it was a "focus brief" passed as `USER_FOCUS` to the plugin's adversarial-review template — the plugin supplied the adversarial framing and JSON schema. Now the file owns everything: adversarial role, substance criteria, user-intent preservation rule, scope-NOT-to-review carve-out, output format (fenced JSON block with `summary` + `findings`).
+- **Detection of the codex dependency switched from `ls` filesystem-probe to `command -v codex`.** Old detection looked for `~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs` — brittle to upstream layout changes. New detection only cares whether the `codex` binary is on `$PATH`, which is a stable contract.
+- **README + Prerequisites simplified.** Installing `codex-plugin-cc` via `/plugin install codex@openai-codex` is no longer required. Only `npm install -g @openai/codex` + `codex login` for users who want Phase 7.6 cross-model consensus.
+
+### Removed
+
+- The v2.0.3 workaround section in the SKILL.md ("Skill tool reports `codex:adversarial-review` as unavailable") — no longer relevant because we never touch the `Skill` tool for codex now.
+
+### Why
+
+The v2.0.3 fix used `node "$COMPANION" adversarial-review …` to bypass the `Skill` tool's `disable-model-invocation` block on the slash command. That worked but kept us coupled to the `codex-plugin-cc` plugin layout, the cache-path glob, and the plugin's internal IPC runtime. By dropping that wrapper, the dependency chain collapses to one well-known public CLI command. Single-plugin install for the user; less code in our SKILL.md; nothing to break when codex-plugin-cc reorganizes its scripts.
+
 ## 2.0.3
 
 ### Fixed

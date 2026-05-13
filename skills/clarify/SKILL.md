@@ -41,7 +41,7 @@ Turn a clean spec into an implementation-ready document with atomic tasks, verif
 - **Slow and thorough — overkill for hour-long tasks.** Decomposition + AC + edge cases + 3 consensus rounds (if codex is available) take 10-15 minutes. For smaller tasks, write the AC by hand.
 - **Does not work on raw chat exports or unstructured notes.** The input spec must already be sectioned with `## ` (after `/cleanup`). Otherwise — abort.
 - **Not suited for product-style PRDs.** This skill forces test-first AC with proof commands; for product-management PRDs use `mattpocock:to-prd` (freeform success metrics).
-- **Phase 7.6 consensus loop requires `codex-plugin-cc` installed in Claude Code.** The skill detects it via a filesystem probe (`ls $HOME/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`) and invokes `node <path> adversarial-review ...` directly via Bash. It does NOT go through the `Skill` tool — the `codex:adversarial-review` slash command has `disable-model-invocation: true` and is only callable when the user types it manually. The bare `codex` CLI alone is also not enough; it's a transitive dependency of the plugin, not the entry point this skill uses. Without the plugin — fallback to internal validation (a single model reviewing its own output, weaker).
+- **Phase 7.6 consensus loop requires the `codex` CLI on `$PATH`** (npm `@openai/codex`). The skill detects it via `command -v codex` and invokes `codex review --uncommitted "<prompt>"` directly. It does NOT depend on `codex-plugin-cc` (the Claude Code plugin); we used to and got bitten by the `Skill` tool refusing to call slash commands with `disable-model-invocation: true`. The dependency is now the public CLI subcommand `codex review`, which is stable and documented. Without `codex` on `$PATH` — fallback to internal validation (a single model reviewing its own output, weaker).
 - **Not for autonomous orchestration.** The output has no `[P]` markers, Stages, or dependency graphs — the execute pipeline was removed from this repo in v2.0. Output is for `mattpocock:tdd` or manual work.
 
 ## How to do it wrong vs right
@@ -83,9 +83,9 @@ Turn a clean spec into an implementation-ready document with atomic tasks, verif
 Step 2 (questioner pattern) and the Phase 7.6 consensus loop (with fallback validator) — templates live in `roles/`:
 
 - `roles/questioner.md` — format contract for AskUserQuestion in step 2 (not a subagent — a format spec)
-- `roles/codex-reviewer.md` — focus brief passed to `codex:adversarial-review` (from [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc)). NOT a full prompt — that command owns the adversarial role and JSON output schema.
+- `roles/codex-reviewer.md` — **full prompt** passed verbatim to `codex review --uncommitted`. Owns the adversarial role, substance criteria, user-intent preservation rule, and JSON output schema. Standalone — no template wrapping.
 - `roles/claude-self-assessor.md` — Phase 7.6 Claude self-assessment in a fresh subprocess (`claude -p`), categorizes Codex findings as ACCEPT / REJECT_PETTY / NEEDS_USER
-- `roles/spec-validator.md` — fallback used inside Phase 7.6 when codex-plugin-cc is not installed
+- `roles/spec-validator.md` — fallback used inside Phase 7.6 when `codex` CLI is not available
 
 Substitutions:
 
@@ -94,17 +94,25 @@ Substitutions:
 | `{spec_path}` | the spec file after step 6 (write) |
 | `{round}` | round counter in Phase 7.6 (1, 2, 3) |
 | `{spec_path}.bak` | original spec (pre-enrichment) for coverage check |
-| `{focus_brief}` | text content of `roles/codex-reviewer.md` (passed verbatim as USER_FOCUS) |
+| `{codex_prompt}` | full text content of `roles/codex-reviewer.md` (entire file, passed as the review prompt) |
 
 Invocations:
-- **Codex adversarial review:** call the codex-companion script **directly via Bash** — NOT via `Skill(skill="codex:adversarial-review", ...)`. The slash-command wrapper has `disable-model-invocation: true` in its frontmatter, so the `Skill` tool refuses to invoke it from inside another skill; only the user typing `/codex:adversarial-review` works that way. The script itself has no such restriction. Resolve the path once and reuse:
+- **Codex adversarial review:** call `codex review --uncommitted` directly via Bash. The codex CLI is a stable public dependency (`npm install -g @openai/codex`); we no longer depend on `codex-plugin-cc` or its `codex-companion.mjs` runtime. The CLI's `review` subcommand takes a custom prompt and a target — `--uncommitted` covers working-tree changes, which is exactly what we need (Step 6 wrote the enriched spec but did NOT commit yet).
   ```bash
-  COMPANION="$(ls -t "$HOME/.claude/plugins/cache/openai-codex/codex/"*"/scripts/codex-companion.mjs" 2>/dev/null | head -1)"
-  [ -n "$COMPANION" ] && [ -f "$COMPANION" ] || echo "codex-plugin-cc not installed"
-  node "$COMPANION" adversarial-review --wait --scope working-tree "$FOCUS_BRIEF"
+  command -v codex >/dev/null 2>&1 || { echo "codex CLI not installed"; exit 1; }
+  PROMPT="$(cat skills/clarify/roles/codex-reviewer.md)"
+  OUTPUT="$(codex review --uncommitted "$PROMPT")"
+  # Extract the last fenced JSON code block — the prompt instructs codex
+  # to emit findings there.
+  FINDINGS="$(printf '%s' "$OUTPUT" | python3 -c '
+import sys, re, json
+text = sys.stdin.read()
+matches = re.findall(r"```json\s*\n(.*?)\n```", text, re.DOTALL)
+print(matches[-1] if matches else json.dumps({"summary":"approve","findings":[]}))
+')"
   ```
-  Output is structured JSON with findings (file, line_start, line_end, confidence, recommendation). Working-tree scope reads the uncommitted spec edit directly.
-- **Claude self-assessment:** Bash subprocess `claude -p` with the prompt from `roles/claude-self-assessor.md` plus the Codex JSON pasted in.
+  Output schema (controlled by `roles/codex-reviewer.md`): `{summary: "needs-attention"|"approve", findings: [{file, line_start, line_end, confidence, recommendation}]}`. If codex's response has no JSON block (model misbehaved), the python extractor falls back to an empty `approve` result — log a warning and treat that round as no-op.
+- **Claude self-assessment:** Bash subprocess `claude -p` with the prompt from `roles/claude-self-assessor.md` plus the Codex findings JSON pasted in.
 - **Fallback validator (no codex):** `Agent(subagent_type="Explore", prompt=substitute("roles/spec-validator.md", vars))`.
 
 ## What the skill does (step by step)
@@ -130,42 +138,37 @@ The old "Execution Order" section (Stages, [P] markers, dependency graph for par
 
 After steps 6-7 (write enriched spec + verify-spec.py mechanical check), the convergence loop runs. Step 8 in the walkthrough is Phase 7.6.
 
-The loop drives `codex:adversarial-review` against the uncommitted spec edit, then has Claude (in a fresh `claude -p` subprocess) categorize the findings. Two independent passes per round — Codex finds, Claude triages.
+The loop drives `codex review --uncommitted` (codex CLI) against the uncommitted spec edit, then has Claude (in a fresh `claude -p` subprocess) categorize the findings. Two independent passes per round — Codex finds, Claude triages. The prompt sent to codex lives in `roles/codex-reviewer.md`.
 
 ```
 MAX_ROUNDS = consensus_rounds_flag (default 3, 0 disables)
 round = 0
-focus_brief = read("roles/codex-reviewer.md")  # the focus block, not the whole file
+codex_prompt = read("roles/codex-reviewer.md")   # the whole file IS the prompt
 
-# Detect codex-plugin-cc by probing for the companion script on disk.
-# Do NOT rely on the Skill tool seeing `codex:adversarial-review` — it
-# won't, the slash command has disable-model-invocation: true.
-COMPANION = bash:
-  ls -t "$HOME/.claude/plugins/cache/openai-codex/codex/"*"/scripts/codex-companion.mjs" 2>/dev/null | head -1
-
-if COMPANION is empty or not a file:
-  log WARNING "codex-plugin-cc not installed; falling back to single-model validation"
+# Detect the codex CLI on $PATH.
+if bash: `command -v codex` returns empty:
+  log WARNING "codex CLI not installed; falling back to single-model validation"
   result = Agent(subagent_type="Explore",
                  prompt=substitute("roles/spec-validator.md",
                                    {spec_path, spec_path_bak}))
   → CONSENSUS or NEEDS_FIX (single round only)
   goto Step 9 (approval gate)
 
-# Ensure spec is in working tree so adversarial-review can see it.
-# (Step 6 already wrote <spec>; do NOT commit yet — uncommitted edit is
-# exactly what working-tree scope is for.)
+# The spec must be in the working tree (not yet committed). Step 6
+# wrote <spec>; do NOT commit until consensus + approval. `codex review
+# --uncommitted` reads staged, unstaged, and untracked changes.
 
 rounds = []   # in-memory history: [{findings, assessment, applied, rejected, escalated}]
 
 while round < MAX_ROUNDS:
   round += 1
 
-  # 1. Codex adversarial review via direct Bash invocation of the
-  #    codex-companion script. The Skill tool cannot call
-  #    `codex:adversarial-review` (disable-model-invocation: true on the
-  #    slash command); the underlying node script has no such restriction.
-  findings_json = bash:
-    node "$COMPANION" adversarial-review --wait --scope working-tree "$focus_brief"
+  # 1. Codex adversarial review via direct `codex review` CLI call.
+  #    Public, stable subcommand; no plugin or Skill-tool dependency.
+  codex_output = bash:
+    codex review --uncommitted "$codex_prompt"
+  findings_json = extract last fenced ```json``` block from codex_output
+                  (python3 one-liner with regex; on miss → {"summary":"approve","findings":[]})
 
   # 2. Claude self-assessment in a fresh subprocess
   assessment = bash: claude -p < (
@@ -209,14 +212,14 @@ if round == MAX_ROUNDS and not CONSENSUS:
 ```
 
 Failure modes:
-- **codex-plugin-cc not installed** → fallback to `roles/spec-validator.md` (single-model), workflow continues with a warning. Detection is via `ls`-probe of `~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`, NOT via the Skill-tool registry — the slash command is invisible to the model anyway.
-- **Skill tool reports `codex:adversarial-review` as unavailable** → expected behaviour, not a real failure. The slash command has `disable-model-invocation: true`, so the Skill tool refuses to call it from inside another skill. The direct Bash invocation of `codex-companion.mjs` bypasses this entirely. If your detection step says "plugin missing" while `/codex:adversarial-review` works for the user manually, you're checking the wrong thing — re-read the Invocations section.
-- **Spec not in a git repository** → `adversarial-review --scope working-tree` requires git. If the spec lives outside any repo, also fall back to spec-validator.
-- **Models gang up on user intent** → `roles/codex-reviewer.md` focus brief explicitly forbids proposing removal of unusual requirements. `roles/claude-self-assessor.md` mirrors the rule when categorizing.
-- **Petty disagreements** → Codex shouldn't emit them (its `finding_bar` excludes style). If any leak through → REJECT_PETTY category, logged with reasoning, not applied.
+- **`codex` CLI not on `$PATH`** → fallback to `roles/spec-validator.md` (single-model), workflow continues with a warning. Detection is via `command -v codex`. Install path for the user: `npm install -g @openai/codex`.
+- **Spec not in a git repository** → `codex review --uncommitted` requires git. If the spec lives outside any repo, also fall back to spec-validator.
+- **Codex's response has no JSON block** → the prompt instructs codex to emit a fenced JSON code block at the end. If the model misbehaves and skips it, the python extractor returns `{"summary":"approve","findings":[]}` — log a warning and the round is treated as no-op. If this happens consistently across rounds, escalate to user.
+- **Models gang up on user intent** → `roles/codex-reviewer.md` explicitly forbids proposing removal of unusual requirements. `roles/claude-self-assessor.md` mirrors the rule when categorizing.
+- **Petty disagreements** → the prompt's "Scope NOT to review" section excludes style/formatting/word-choice. If any leak through → REJECT_PETTY category, logged with reasoning, not applied.
 - **Oscillation** → hash comparison between rounds N and N-2, escalation.
 
-Output schema reminder (from codex-plugin-cc's adversarial-review prompt):
+Output schema reminder (defined by `roles/codex-reviewer.md`):
 ```json
 {
   "summary": "needs-attention | approve",
@@ -246,7 +249,7 @@ Phase 7.6 internals (Codex findings per round, applied/rejected/escalated breakd
 - **Input:** typically after `/cleanup` (sectioned markdown without `[MISSING]` markers). A manually written spec is also fine if it's structurally valid.
 - **Output:** enriched spec with AC + proof commands. The skill stops here — downstream choices (test-first build, manual work, independent AC verification) belong to the user, not to the skill.
 - **Does not call** other skills automatically. After step 9 (approval): `Spec approved. /clear before continuing.` — no next-step suggestion.
-- **Cross-model dependency:** Phase 7.6 uses `codex:adversarial-review` from [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) if installed and the spec is in a git repo. Without it — graceful fallback to `roles/spec-validator.md`.
+- **Cross-model dependency:** Phase 7.6 uses `codex review --uncommitted` from the [codex CLI](https://github.com/openai/codex) (`npm install -g @openai/codex`) if installed and the spec is in a git repo. Without it — graceful fallback to `roles/spec-validator.md`.
 
 ## Rules
 

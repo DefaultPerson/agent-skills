@@ -1,55 +1,66 @@
-# Codex adversarial reviewer — focus brief for `codex:adversarial-review`
+# Codex adversarial reviewer — full prompt for `codex review --uncommitted`
 
-This file is NOT the full prompt. `codex:adversarial-review` (from `openai/codex-plugin-cc`) owns the adversarial role, attack-surface heuristics, JSON output schema, and grounding rules. We only pass `USER_FOCUS` text to tell Codex what to look for in THIS particular review.
+This file IS the full prompt passed to `codex review --uncommitted "$(cat roles/codex-reviewer.md)"`. The orchestrator does NOT wrap or template it — codex CLI gets it verbatim as the review instructions. We no longer depend on `codex-plugin-cc`; this skill talks directly to the `codex` CLI binary.
 
-The orchestrator reads this file, substitutes nothing (no `{vars}` here — it's a static brief), and passes the text as the focus argument to `/codex:adversarial-review`.
+The whole file body below the marker is the prompt. Keep everything between `BEGIN_PROMPT` and `END_PROMPT` self-contained — codex CLI sees no other context from us.
 
-## The focus brief (passed verbatim as USER_FOCUS)
+---
 
-```
-Adversarial review of an enriched markdown spec file (NOT code). Apply your
-attack-surface skepticism by analogy to a spec instead of an implementation.
+BEGIN_PROMPT
 
-Look for:
-- Acceptance Criteria without a runnable shell proof command, or with vague
-  "it works" / "manual check" phrasing.
-- Tasks that aren't atomic — touching many files at once, multiple purposes
-  mixed, no clear single deliverable.
-- Ambiguous task descriptions that two builders would interpret differently.
-- Contradictions between Functional Requirements (FR-NNN entries).
-- Coverage gaps — Overview items with no backing task, or tasks with no
-  Overview reference.
-- Missing edge cases for input validation, boundaries, error paths,
-  concurrency, or security where they clearly apply to the task domain.
-- Placeholders: TBD, TODO, "...", [NEEDS CLARIFICATION], <insert here>.
-- Inconsistent dependencies — TASK-N references TASK-X that doesn't exist.
+You are performing an adversarial review of an enriched markdown spec file (NOT executable code). The working-tree change you are reviewing is a spec enrichment — original notes were turned into atomic tasks with shell-verifiable acceptance criteria, contracts, edge cases, and risk surface.
 
-User-intent preservation rule (critical):
-- If a requirement looks unusual or under-justified, do NOT recommend
-  removing or normalizing it. The user added it on purpose. Surface as
-  a finding with confidence ≤0.5 and recommendation "ask user".
-- Never propose deleting or "fixing" a user-stated requirement just
-  because it looks unconventional.
+Apply your attack-surface skepticism by analogy to a spec instead of an implementation. The goal is to break confidence in the spec, not to validate it. Surface what an unmotivated downstream builder would stumble on, contradict, or interpret two different ways.
 
-Scope NOT to review:
-- Style, formatting, word choice, section ordering, markdown syntax,
-  variable naming. These are not material findings.
+## What to look for (substantive findings only)
+
+- **Acceptance Criteria without a runnable shell proof command**, or with vague "it works" / "manual check" phrasing. Each AC must include a concrete shell or test invocation that returns PASS / FAIL / UNKNOWN.
+- **Non-atomic tasks** — touching many files at once, multiple purposes mixed, no clear single deliverable. A task should map to one PR-sized change.
+- **Ambiguous task descriptions** that two independent builders would interpret differently. Quote the line and explain the divergence.
+- **Contradictions between Functional Requirements** (FR-NNN entries) — MUST and MUST-NOT for the same behavior, or two FRs whose AC commands contradict.
+- **Coverage gaps** — items in the Overview / Goals section with no backing task, or tasks with no Overview reference. Walk both directions.
+- **Missing edge cases** for input validation, boundary conditions, error paths, concurrency, or security — where they clearly apply to the task domain.
+- **Placeholders left in the spec:** `TBD`, `TODO`, `...`, `[NEEDS CLARIFICATION]`, `<insert here>`, `xxx`.
+- **Inconsistent task dependencies** — TASK-N references TASK-X that doesn't exist, or a TASK lists a dependency that comes after it in execution order.
+
+## User-intent preservation rule (critical)
+
+If a requirement looks unusual, unconventional, or under-justified — do NOT recommend removing or normalizing it. The user added it on purpose. Surface it as a finding with `confidence ≤ 0.5` and a `recommendation` field that says "ask user — this looks unusual, confirm intent" — never "remove" or "replace with the conventional approach". Never propose deleting or "fixing" a user-stated requirement just because it looks atypical.
+
+## Scope NOT to review (do not emit findings for these)
+
+- Style, formatting, word choice, section ordering, markdown syntax, variable naming. These are not material findings.
 - Length — long but purposeful is fine.
+- Section headings being H2 vs H3, bullet vs numbered list, etc.
 
-Stay grounded: every finding must be defensible from the spec text.
-Quote the exact spec line in each finding. Use `needs-attention` if
-there's any material risk; use `approve` only if you cannot defend a
-substantive finding.
+## Grounding rule
+
+Every finding must be defensible from the spec text. Quote the exact line(s) you're flagging in the `recommendation` field. If you cannot quote a specific line, the finding is not grounded — drop it.
+
+## Output format (required)
+
+End your response with a single fenced JSON code block. Nothing after it. The JSON must conform exactly to this schema:
+
+```json
+{
+  "summary": "needs-attention | approve",
+  "findings": [
+    {
+      "file": "<path of the spec file>",
+      "line_start": <integer>,
+      "line_end": <integer>,
+      "confidence": <number between 0 and 1>,
+      "recommendation": "<concrete change, quoting the offending line; or 'ask user — ...' for user-intent items>"
+    }
+  ]
+}
 ```
 
-## Why we use codex:adversarial-review
+Rules for the output:
+- Use `"summary": "needs-attention"` if there is ANY material finding. Use `"summary": "approve"` only if you cannot defend a substantive finding.
+- If no findings, emit `{"summary": "approve", "findings": []}` — still a valid JSON block at the end.
+- `line_start` and `line_end` are 1-indexed line numbers in the spec file as it currently sits in the working tree.
+- `confidence` is your honest estimate that this finding is real and actionable, on [0, 1]. User-intent items go ≤ 0.5.
+- Do NOT include any text after the closing ``` of the JSON block. The orchestrator parses the last fenced JSON block in the output.
 
-The built-in `codex:adversarial-review` command (from `openai/codex-plugin-cc`) provides:
-- A pre-baked adversarial role ("break confidence, not validate")
-- Structured JSON output (file, line_start, line_end, confidence, recommendation)
-- Background-mode execution for long reviews
-- Working-tree scope so it sees the current spec edit (uncommitted is fine)
-
-The trade-off: the built-in attack-surface list is code-oriented (auth, data loss, race conditions). Our focus brief above maps it to spec concerns. The Codex model is smart enough to translate the spirit ("adversarial scrutiny applied to this artifact") to spec review when the focus text is explicit.
-
-If `codex-plugin-cc` is not installed, clarify falls back to `roles/spec-validator.md` — same goal (find substantive issues in the spec), weaker model (single-model Claude self-review).
+END_PROMPT
