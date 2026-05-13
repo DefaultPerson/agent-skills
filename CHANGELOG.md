@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.2
+
+### Changed
+
+- **`/clarify` step 10 — backup disposition.** After approval, the skill now asks via AskUserQuestion whether to delete `<spec>.bak`. Default = delete (rollback is still possible via `git checkout HEAD -- <spec>` against the `pre-clarify: <name>` snapshot from step 6). Escape hatch = keep, for diff-compare or extra safety. Prevents `.bak` files from silently accumulating in the workspace and polluting `git status`.
+
 ## 2.0.1
 
 Hardening pass on the v2.0 trio. No breaking API; behaviour changes only inside `/extract` output layout and `/clarify` consensus-loop hygiene.

@@ -111,7 +111,12 @@ Invocations:
 6. **Write the enriched spec.** Back up the original (`<spec>.bak`), write enriched into the original path. Template structures: see `references/task-format.md`.
 7. **Mechanical validation.** `python3 scripts/verify-spec.py <spec>`. FAIL → fix and re-run.
 8. **Cross-model consensus loop (Phase 7.6).** Codex review + Claude self-assess, iterate until CONSENSUS or max rounds. Details — next section. Can be skipped with `--consensus-rounds 0`.
-9. **Approval gate.** Summary report + AskUserQuestion (Approve / Modify / Questions). After approval: `"Spec approved. /clear before continuing."` — no downstream recommendation.
+9. **Approval gate.** Summary report + AskUserQuestion (Approve / Modify / Questions). After approval, proceed to step 10.
+10. **Backup disposition.** Spec is approved — `<spec>.bak` is no longer load-bearing and just clutters `git status`. Single AskUserQuestion:
+    1. **Delete `<spec>.bak`** (default, recommended) — `rm <spec>.bak`. Clean workspace; rollback is still possible via `git checkout HEAD -- <spec>` (the `pre-clarify: <name>` snapshot from step 6 holds the original).
+    2. **Keep `<spec>.bak`** — for further iteration or extra safety net (e.g. the user wants to diff-compare manually before fully trusting the enriched version).
+    
+    After the choice: `"Spec approved. /clear before continuing."` — no downstream recommendation.
 
 The old "Execution Order" section (Stages, [P] markers, dependency graph for parallel spawn) is GONE in v2.0. It existed for the execute orchestration, which no longer ships.
 
@@ -215,8 +220,8 @@ Output schema reminder (from codex-plugin-cc's adversarial-review prompt):
 
 ## Outputs
 
-- `<spec>.bak` — original before enrichment
 - `<spec>` — overwritten with enriched version
+- `<spec>.bak` — original before enrichment. Lifetime: created in step 6, lives through Phase 7.6, offered for deletion at step 10. If the user opted to delete it, it's gone by the time the skill exits; rollback then goes through `git checkout HEAD -- <spec>` against the `pre-clarify: <name>` snapshot.
 
 Git: `pre-clarify: <name>` (snapshot before) and `clarify: enrich <name>` (after step 6).
 
@@ -249,6 +254,6 @@ Would this spec pass review by a senior engineer who has to build the system fro
 - Is every task atomic — 1-3 files, single purpose, executable by an independent worker without questions to the author?
 - Did Phase 7.6 pass (or was it explicitly skipped with reasoning)?
 - Coverage: does every Overview item have at least one task? Does every task track back to Overview / FR?
-- Backup `<spec>.bak` exists — the user can roll back?
+- Was the user offered the choice to keep or delete `<spec>.bak` at step 10? (If kept — backup is on disk. If deleted — rollback via `git checkout HEAD -- <spec>` against the pre-clarify snapshot is still available.)
 
 If "no" on any item — redo, don't ship.
