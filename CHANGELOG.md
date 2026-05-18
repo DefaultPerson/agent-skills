@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.3.0
+
+Codex CLI support — `agent-skills` now ships dual SKILL.md variants (Claude + Codex) with shared `roles/`, `scripts/`, `references/` via install-time symlinks. Same skills, two hosts, no dual maintenance for the shared core.
+
+### Added
+
+- **Codex CLI variants** — `skills-codex/{cleanup,clarify,extract}/SKILL.md` (3 new files). Behaviourally identical to Claude variants; differ only in invocation idiom:
+  - User gates: numbered TUI prompts instead of `AskUserQuestion` clickable radio
+  - cleanup gap-detection: `codex exec -` subprocesses (sequential or `xargs -P N` parallel) instead of in-process `Agent` tool
+  - clarify Phase 7.6: **symmetric cross-model consensus** — Codex variant uses `claude -p` as the cross-model reviewer (since host is Codex, Claude is "the other model") and `codex exec -` as same-family-fresh-ctx self-assessor
+- **`install-codex.sh`** — shell installer that creates `~/.codex/skills/<name>/` dirs with symlinks to Codex-variant SKILL.md plus shared subdirs from Claude variant tree. Idempotent (`ln -sfn`).
+- **`skills/clarify/roles/codex-self-assessor.md`** — mirror of `claude-self-assessor.md` for the Codex variant's Phase 7.6. Same categorization logic (ACCEPT / REJECT_PETTY / NEEDS_USER), reframed for Codex as the assessor.
+- **README "Install in Codex CLI" section** — LLM-pasteable 5-step Bash block (clone + install + verify + check deps + restart). Self-contained, idempotent, self-verifying.
+
+### Changed
+
+- **`skills/clarify/roles/codex-reviewer.md`** — minor rewrite of the intro to work for both invocation paths: `codex review --uncommitted "<prompt>"` (Claude variant) and `claude -p - < prompt` with `<spec_path>` substituted (Codex variant). Same file, both modes via "Read the spec at <spec_path> from disk OR work from the working-tree diff" wording.
+- **`skills/clarify/SKILL.md`** — removed `WebSearch`, `WebFetch` from `allowed-tools` (dead code, never actually invoked in workflow).
+
+### Why
+
+Previously `agent-skills` only worked in Claude Code. v2.0.0 deleted `skills-codex/` arguing skills were "tool-agnostic at the Bash level" — true at frontmatter level, false for body text that literally mentioned `AskUserQuestion` / `Agent` as Claude-only verbs. v2.3.0 reintroduces Codex variants — but **without dual maintenance for shared core** (roles/scripts/references symlink from Claude variant tree). Only SKILL.md bodies diverge (~20-30% of total content), with direct unambiguous invocations in each host instead of conditional "if-host-X-do-Y" prose. Phase 7.6 cross-model consensus is symmetric — each host uses the other agent as the cross-model reviewer.
+
+Codex's native `codex plugin install` is not yet shipped (`plugins` feature flag stable but disabled); v2.3 uses symlinks. When Codex adds plugin install, this section will be replaced with a one-liner via Codex marketplace.
+
 ## 2.2.0
 
 `/clarify` no longer makes scope decisions on its own. Step 5 now has a hard user-facing gate.

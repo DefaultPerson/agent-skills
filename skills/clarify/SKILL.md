@@ -17,7 +17,7 @@ when_to_use: >
   (human, mattpocock:tdd, or goal feature). Do NOT use for raw chat
   exports (run /cleanup first), for already-decomposed specs, or for
   product-management-style PRDs (mattpocock:to-prd is better suited).
-allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, AskUserQuestion, WebSearch, WebFetch]
+allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, AskUserQuestion]
 ---
 
 # Clarify

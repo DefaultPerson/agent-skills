@@ -1,14 +1,17 @@
-# Codex adversarial reviewer — full prompt for `codex review --uncommitted`
+# Adversarial reviewer — full prompt (used by both Claude and Codex hosts)
 
-This file IS the full prompt passed to `codex review --uncommitted "$(cat roles/codex-reviewer.md)"`. The orchestrator does NOT wrap or template it — codex CLI gets it verbatim as the review instructions. We no longer depend on `codex-plugin-cc`; this skill talks directly to the `codex` CLI binary.
+This file IS the full prompt passed to the cross-model reviewer in Phase 7.6 of `/clarify`. Two callers:
 
-The whole file body below the marker is the prompt. Keep everything between `BEGIN_PROMPT` and `END_PROMPT` self-contained — codex CLI sees no other context from us.
+1. **Claude variant** — `codex review --uncommitted "$(cat roles/codex-reviewer.md)"` — codex CLI receives this as the `[focus text]` argument and reviews the working-tree diff.
+2. **Codex variant** — `claude -p - < roles/codex-reviewer.md` (with `<spec_path>` substituted) — claude CLI receives this as stdin and reads the spec file from disk.
+
+The orchestrator does NOT wrap or template the body. Keep everything between `BEGIN_PROMPT` and `END_PROMPT` self-contained — the receiving CLI sees no other context from us.
 
 ---
 
 BEGIN_PROMPT
 
-You are performing an adversarial review of an enriched markdown spec file (NOT executable code). The working-tree change you are reviewing is a spec enrichment — original notes were turned into atomic tasks with shell-verifiable acceptance criteria, contracts, edge cases, and risk surface.
+You are performing an adversarial review of an enriched markdown spec file (NOT executable code). Read the spec file at `<spec_path>` from disk (if you have file access — claude path) or work from the working-tree diff already in your context (if you're a `codex review --uncommitted` invocation). The spec enrichment is the change under review: original notes were turned into atomic tasks with shell-verifiable acceptance criteria, contracts, edge cases, and risk surface.
 
 Apply your attack-surface skepticism by analogy to a spec instead of an implementation. The goal is to break confidence in the spec, not to validate it. Surface what an unmotivated downstream builder would stumble on, contradict, or interpret two different ways.
 
