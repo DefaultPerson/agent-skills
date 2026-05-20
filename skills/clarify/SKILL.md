@@ -125,6 +125,20 @@ If the codebase has paths/types matching spec terms, read them. If code says X a
 ❌ **Stale:** Spec describes `POST /users` accepting `{email, name}`; code at `src/routes/users.py` already accepts `{email, name, phone}`. Skill writes spec as-is.
 ✅ **Reconciled:** Skill flags in step 2 questioner: "Spec describes a POST shape with {email, name}; code already accepts {email, name, phone}. Is the spec describing a regression, or did you forget phone?" — wait for user before proceeding.
 
+### Vertical slices, not horizontal layers
+
+Each task is a thin vertical slice that cuts through ALL relevant layers end-to-end (schema → API → UI → tests), not a horizontal slice of one layer. A finished slice is demoable / verifiable on its own. Prefer many thin slices over few thick ones.
+
+❌ **Horizontal:** TASK-1 "Add all DB columns"; TASK-2 "Add all API endpoints"; TASK-3 "Add all UI"; TASK-4 "Add all tests". Nothing demoable until task 3 lands.
+✅ **Vertical:** TASK-1 "Add email field to User: column + API field + form input + integration test"; TASK-2 "Add phone field: same set". Each task ships an observable user-visible behaviour change.
+
+### Behavioural AC, not procedural
+
+The AC describes what the system DOES (observable through its interface), not HOW the implementation does it. The next reader writes the test from the AC; they shouldn't need to read implementation prose.
+
+❌ **Procedural:** "AC: middleware extracts token from header, calls `validateJWT()`, returns 401 if invalid."
+✅ **Behavioural:** "AC: `curl -H 'Auth: <expired-token>' /api/me` returns `401 { error: 'token_expired' }` and the response body matches the schema in references/task-format.md."
+
 ## Roles
 
 Step 2 (questioner pattern) and the Phase 7.6 consensus loop (with fallback validator) — templates live in `roles/`:
@@ -188,7 +202,9 @@ print(matches[-1] if matches else json.dumps({"summary":"approve","findings":[]}
    - Items in a `Non-goals` section that map back to anything mentioned in the input.
    - Features / endpoints / edge cases present in the input that have no backing task or were silently dropped from a task's coverage.
    
-   If any signal is found, surface a batched AskUserQuestion (multiSelect=false, one question per item, up to 4 per call — batch into multiple calls if more) with the options `Keep deferred (current)` / `Include in v1` / `Drop entirely`. Apply user decisions to the in-memory spec. Loop back to step 3/4 if scope changes require re-decomposition. NEVER write to disk while scope cuts are unconfirmed. If the audit finds nothing — gate silently passes.
+   If any signal is found, surface a batched AskUserQuestion (multiSelect=false, one question per item, up to 4 per call — batch into multiple calls if more) with the options `Keep deferred (current)` / `Include in v1` / `Drop entirely` / `Drop and document in .out-of-scope/`. Apply user decisions to the in-memory spec. For `Drop and document`, write `.out-of-scope/<concept>.md` per `references/out-of-scope-format.md` (or append to existing). Loop back to step 3/4 if scope changes require re-decomposition. NEVER write to disk while scope cuts are unconfirmed. If the audit finds nothing — gate silently passes.
+
+   Phase 1 also reads existing `.out-of-scope/*.md` if present. If the input spec mentions a concept matching a prior rejection, surface in Phase 2 questioner so the user can confirm the rejection still stands or reconsider (in which case the matching `.out-of-scope/` file is removed).
 6. **Write the enriched spec.** Back up the original (`<spec>.bak`), write enriched into the original path. Template structures: see `references/task-format.md`.
 7. **Mechanical validation.** `python3 scripts/verify-spec.py <spec>`. FAIL → fix and re-run.
 8. **Cross-model consensus loop (Phase 7.6).** Codex review + Claude self-assess, iterate until CONSENSUS or max rounds. Details — next section. Can be skipped with `--consensus-rounds 0`.

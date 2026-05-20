@@ -1,6 +1,6 @@
 # agent-skills
 
-Three focused skills for the pre-implementation half of an AI coding workflow: losslessly reorganize messy notes, pull content out of links, decompose specs into atomic tasks with verifiable acceptance criteria.
+Five focused skills for the pre-implementation half of an AI coding workflow: losslessly reorganize messy notes, pull content out of links, decompose specs into atomic tasks with verifiable acceptance criteria, debug hard bugs with a disciplined feedback loop, and surface architectural deepening opportunities.
 
 ## The Flow
 
@@ -25,7 +25,12 @@ The `/to-prd` seam (if installed separately) wraps the enriched spec as a PRD an
 
 - **`/cleanup`** — losslessly reorganize a messy notes/plan/chat dump into a clean sectioned markdown file. Three-level gap detection (deterministic URL check + per-section semantic agents + fuzzy coverage net) proves nothing was lost. Multi-file input → multi-file output (per-source pipelines, not merged).
 - **`/extract`** — pull content out of every URL in a notes file (YouTube subtitles via yt-dlp, public Telegram via embed-page scrape, HTML via pandoc/curl). Replaces each URL with a local pointer, preserves originals, gitignores extracted content.
-- **`/clarify`** — turn a clean spec into an implementation-ready document: atomic tasks with Given/When/Then acceptance criteria, shell-runnable proof commands, contracts (FR-NNN with MUST/SHOULD/MAY), edge cases, risks. Reads existing `docs/adr/*.md` and offers to write new ADRs for hard-to-reverse decisions surfaced during decomposition (cap 3 per run, all 3 criteria must hold). Cross-model consensus loop with Codex (optional) catches issues single-model self-review misses.
+- **`/clarify`** — turn a clean spec into an implementation-ready document: atomic vertical-slice tasks (each cuts schema/API/UI/tests end-to-end) with behavioural Given/When/Then AC, shell-runnable proof commands, contracts (FR-NNN with MUST/SHOULD/MAY), edge cases, risks. Reads existing `docs/adr/*.md` and offers to write new ADRs for hard-to-reverse decisions surfaced during decomposition (cap 3 per run, all 3 criteria must hold). Phase 5 Scope-cut audit can record firm rejections to `.out-of-scope/<concept>.md`. Cross-model consensus loop with Codex (optional) catches issues single-model self-review misses.
+
+Two orthogonal skills (independent of the main flow):
+
+- **`/diagnose`** — disciplined debug loop for hard bugs and performance regressions. Phase 1 is the heart: build a fast deterministic feedback loop (10 ways listed, from failing test to bisection harness to HITL bash). Then reproduce → 3-5 ranked falsifiable hypotheses → instrument (with `[DEBUG-xxxx]` tags for one-grep cleanup) → fix with regression test at the correct seam → post-mortem. If no correct seam exists for the regression test, that itself is the finding — surfaces a `/deepen` candidate.
+- **`/deepen`** — find shallow modules (interface nearly as complex as implementation) and propose deepening refactors. Uses Ousterhout vocabulary (Module / Interface / Seam / Adapter / Depth / Leverage / Locality), the deletion test, and the "one adapter = hypothetical seam / two = real" rule. Optional "Design It Twice" Phase 3 spawns 3 parallel sub-agents with different design constraints (minimise interface / maximise flexibility / optimise common caller), then recommends one or a hybrid.
 
 Each skill follows the same template — `description` states triggers and tradeoffs (not algorithm), honest weakness section up front, ❌/✅ contrast pairs, "letter = spirit" canon, Cialdini-framed rules, senior-review self-check before output.
 

@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.5.0
+
+Two new skills (`/diagnose`, `/deepen`) plus three discipline upgrades baked into `/clarify`: tracer-bullet vertical slices, behavioural AC, optional HITL/AFK marker. `.out-of-scope/` knowledge base added as a Phase 5 Scope-cut audit option.
+
+### Added
+
+- **`/diagnose` skill** — disciplined debug loop for hard bugs and performance regressions. Six phases: (1) build a feedback loop, (2) reproduce, (3) 3-5 ranked falsifiable hypotheses, (4) instrument with `[DEBUG-xxxx]` log tags, (5) fix with regression test at the correct seam, (6) cleanup + post-mortem. Phase 1 lists 10 ways to construct a feedback loop (failing test → curl → CLI diff → headless browser → trace replay → throwaway harness → fuzz → bisection harness → differential loop → HITL bash). If no correct seam exists for the regression test in Phase 5, surfaces a `/deepen` candidate as the finding. ~190 lines. Skill files: `skills/diagnose/SKILL.md` + Codex variant.
+- **`/deepen` skill** — surface shallow modules and propose deepening refactors. Ousterhout vocabulary (Module / Interface / Seam / Adapter / Depth / Leverage / Locality) is opinionated on purpose. Four phases: (1) explore with Agent subagent + deletion test, (2) present candidates using consistent vocabulary, (3) optional "Design It Twice" via 3 parallel sub-agents with different constraints (minimise / maximise / optimise common), (4) capture decision + optional ADR. ~180 lines main + 3 reference files. Skill files: `skills/deepen/SKILL.md` + `skills/deepen/references/{architecture-language,deepening-patterns,parallel-interface-design}.md` + Codex variant.
+- **Vertical-slice task discipline in `/clarify`** — Writing style section gains a "Vertical slices, not horizontal layers" rule with ❌/✅ pair. `references/task-format.md` atomic-scope rule updated: each task is a thin vertical slice through every relevant layer (schema/API/UI/tests). Horizontal slices ("add all DB columns, then all API endpoints, then all UI") are explicitly called out as anti-pattern.
+- **Behavioural AC rule in `/clarify`** — Writing style section gains "Behavioural AC, not procedural" rule with ❌/✅ pair. AC describes what the system DOES (observable through its interface), not HOW the implementation does it.
+- **HITL/AFK marker in `/clarify`** — `references/task-format.md` adds optional `**Mode**` field (`AFK` default, `HITL` when human judgment needed). Absence implies `AFK`.
+- **`.out-of-scope/<concept>.md` knowledge base** — Phase 5 Scope-cut audit gains a fourth option, `Drop and document in .out-of-scope/`. Phase 1 reads existing `.out-of-scope/*.md` to flag prior rejections that match the input spec. New `skills/clarify/references/out-of-scope-format.md` documents the format.
+- **`install-codex.sh`** — loop now installs `cleanup clarify extract diagnose deepen` (5 skills) into `~/.codex/skills/`. Shared `references/` symlinks per skill resolve automatically.
+
+### Changed
+
+- **`/clarify` `## Writing style for the enriched spec`** — section now has 7 rules instead of 5 (added vertical slices + behavioural AC). Existing 5 rules unchanged.
+- **`/clarify` Phase 5 Scope-cut audit options** — `Keep deferred (current)` / `Include in v1` / `Drop entirely` / **`Drop and document in .out-of-scope/`** (new).
+- **README** — skill count updated from three to five; new `/diagnose` and `/deepen` listed as "Two orthogonal skills (independent of the main flow)" — they're reactive, not part of the linear cleanup→clarify chain.
+
+### Why
+
+The pocock plugin had a few genuinely useful ideas buried in a wide skill suite that didn't fit our needs. v2.5.0 extracts the high-value subset and adapts it to our existing skills + drops the pocock dependency.
+
+- **`/diagnose`** — the "build the feedback loop FIRST" discipline is the single most useful debug habit. Codifying it as a skill means it actually runs instead of getting skipped.
+- **`/deepen`** — Ousterhout's depth-as-leverage + the "one adapter / two adapters" rule + "Design It Twice" parallel exploration are heavy-but-effective tools for mature codebases. Made optional so green-field work doesn't pay the cost.
+- **Vertical slices** — horizontal decomposition is the most common mistake in spec writing; nothing demoable until all tasks land. Explicit ❌/✅ pair in the writing style closes the loophole.
+- **Behavioural AC** — procedural AC ("middleware extracts token, calls validateJWT()") couples the spec to the current implementation. Behavioural AC ("curl returns 401 with body X") survives refactors.
+- **HITL/AFK** — for projects that mix autonomous and human-judgment work, the marker makes triage trivial.
+- **`.out-of-scope/`** — durable rejection memory beats re-litigating the same idea every six months.
+
 ## 2.4.0
 
 `/clarify` learns to write in the project's vocabulary, surfaces hard-to-reverse decisions as ADR offers, and exposes an optional seam to publish to an issue tracker. Both Claude and Codex variants updated in lockstep.

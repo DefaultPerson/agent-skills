@@ -65,6 +65,7 @@ Flat numbered list, minimal fields.
 ## Common to ALL formats
 
 - `**Status**` field — `todo` (default). The user or `mattpocock:tdd` updates it to `done` / `blocked` / `failed` as work proceeds.
+- `**Mode**` field — `AFK` (default) or `HITL`. `AFK` = an autonomous agent can close it with no human in the loop. `HITL` = needs human judgment (architecture call / design review / external access / manual verification). Add the field only when `HITL`; absence implies `AFK`.
 - `**Files**` — exact paths, not "auth module", not "user-related files".
 - `**Leverage**` — required. Forces a look for reusable code before writing from scratch. "none" is fine if genuinely from scratch.
 - Acceptance criteria — each with a runnable proof command. PASS / FAIL / UNKNOWN tristate. Never boolean.
@@ -80,14 +81,14 @@ If the spec is consumed by `mattpocock:tdd` or a human, they build their own wor
 
 ## Atomic scope rule
 
-Each task = 1-3 related files. If more — split:
+Each task = 1-3 related files AND a **thin vertical slice** through every layer it needs (schema → API → UI → tests, or whichever subset applies). A finished slice is demoable or verifiable on its own. If a task only touches one layer and isn't observable end-to-end, it's the wrong shape — split differently.
 
 ❌ "Implement authentication system" — touches many files, multiple purposes.
 ❌ "Add user management" — vague scope, no file paths.
+❌ "Add DB columns for user profile" — horizontal slice; nothing demoable until API + UI land.
 
-✅ "Create User model in `src/models/user.py` with email/password fields".
-✅ "Add password hashing utility in `src/utils/auth.py` using bcrypt".
-✅ "Create LoginForm component in `src/components/LoginForm.tsx`".
+✅ "Add `phone` field to User: column in `src/models/user.py` + accept in `src/routes/users.py POST /users` + render in `src/components/UserForm.tsx` + integration test in `tests/test_users.py`" — vertical slice; demoable independently.
+✅ "Create User model in `src/models/user.py` with email/password fields" — also OK when the model is the whole feature this task is about and no other layers are touched.
 
 ## Edge cases — which categories to include
 
