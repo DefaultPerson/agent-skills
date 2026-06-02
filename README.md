@@ -1,6 +1,6 @@
 # agent-skills
 
-Five focused skills for the pre-implementation half of an AI coding workflow: losslessly reorganize messy notes, pull content out of links, decompose specs into atomic tasks with verifiable acceptance criteria, debug hard bugs with a disciplined feedback loop, and surface architectural deepening opportunities.
+Six skills for an AI coding workflow: losslessly reorganize messy notes, pull content out of links, decompose specs into atomic tasks with verifiable acceptance criteria, debug hard bugs with a disciplined feedback loop, surface architectural deepening opportunities, and fetch SVG brand logos from svgl.app.
 
 ## The Flow
 
@@ -31,6 +31,10 @@ Two orthogonal skills (independent of the main flow):
 
 - **`/diagnose`** — disciplined debug loop for hard bugs and performance regressions. Phase 1 is the heart: build a fast deterministic feedback loop (10 ways listed, from failing test to bisection harness to HITL bash). Then reproduce → 3-5 ranked falsifiable hypotheses → instrument (with `[DEBUG-xxxx]` tags for one-grep cleanup) → fix with regression test at the correct seam → post-mortem. If no correct seam exists for the regression test, that itself is the finding — surfaces a `/deepen` candidate.
 - **`/deepen`** — find shallow modules (interface nearly as complex as implementation) and propose deepening refactors. Uses Ousterhout vocabulary (Module / Interface / Seam / Adapter / Depth / Leverage / Locality), the deletion test, and the "one adapter = hypothetical seam / two = real" rule. Optional "Design It Twice" Phase 3 spawns 3 parallel sub-agents with different design constraints (minimise interface / maximise flexibility / optimise common caller), then recommends one or a hybrid.
+
+A standalone utility (independent of the spec flow):
+
+- **`/svgl`** — fetch SVG brand/tech logos from the [svgl.app](https://svgl.app) API into your project, by name or category. Downloads the actual `.svg` files (light/dark theme-aware, optional wordmarks) into `./svgl/`, or `--json` for metadata/URLs only. Interactive disambiguation when a query matches several logos; `--all` to skip it.
 
 Each skill follows the same template — `description` states triggers and tradeoffs (not algorithm), honest weakness section up front, ❌/✅ contrast pairs, "letter = spirit" canon, Cialdini-framed rules, senior-review self-check before output.
 
@@ -121,6 +125,7 @@ When Codex ships native `codex plugin install`, this section will be replaced wi
 ## Prerequisites
 
 - **Required:** Git, `bash`, `jq`, `python3`.
+- **`/svgl` deps:** `curl` + `jq` (both already required) — no extra install.
 - **`/extract` deps** (probed at runtime, install prompt if missing): `yt-dlp` (YouTube subtitles), `pandoc` (HTML — optional, falls back to crude curl). Telegram works with just `curl`. **Light mode** needs only `curl` (+ `yt-dlp` for YouTube metadata); no `pandoc`.
 - **`/clarify` Phase 7.6 optional:**
   - In **Claude Code**: [Codex CLI](https://github.com/openai/codex) (`npm install -g @openai/codex`) — Claude variant uses `codex review --uncommitted` as the cross-model reviewer.

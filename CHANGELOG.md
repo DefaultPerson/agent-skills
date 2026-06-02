@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.7.0
+
+New `/svgl` skill — fetch SVG brand/tech logos from the svgl.app public API straight into a project. Dual variant (Claude + Codex), dependency-light (curl + jq, both already required).
+
+### Added
+
+- **`/svgl` skill** — search logos by name, browse a category, or `--list-categories`; downloads the actual `.svg` files into `./svgl/` (light/dark theme-aware, optional `--wordmark`), or `--json` for metadata/URLs only. Ambiguous queries (>1 match, no exact title) go through disambiguation — `AskUserQuestion` in the Claude variant, a numbered TUI prompt in the Codex variant — with `--all` to skip and an exact-title fast path. Skill files: `skills/svgl/SKILL.md` + Codex variant + shared `skills/svgl/scripts/svgl.sh`.
+- **`skills/svgl/scripts/svgl.sh`** — curl + jq API wrapper (`categories` / `search` / `category` / `download`). Base `https://api.svgl.app`. Handles svgl's polymorphic `route`/`wordmark` (`string` or `{light,dark}`) and `category` (`string` or `string[]`), validates downloads are real SVG, and works around an API quirk: `limit` is silently ignored when combined with `search` or `/category`, so the script never sends it there and slices client-side. Shared with the Codex variant via the existing `scripts/` symlink.
+
+### Changed
+
+- **`install-codex.sh`** — loop now installs `cleanup clarify extract diagnose deepen svgl` (6 skills) into `~/.codex/skills/`.
+- **README** — skill count five → six; `/svgl` added as a standalone utility; Prerequisites note (`/svgl` needs only the already-required `curl` + `jq`).
+- **`plugin.json` / `marketplace.json`** — version → 2.7.0; descriptions mention svgl.app logo fetching; keywords gain `svgl`, `svg`, `logo`, `icons`.
+
+### Why
+
+svgl.app is a high-quality, public catalogue of brand/tech SVG logos (~660). A skill turns "drop the React + Vercel + Next.js logos into ./assets" into one command instead of manual hunting and copy-paste. It's a thin wrapper over the public API — no new dependencies (curl + jq are already required) — and follows the dual-variant pattern so Claude Code and Codex behave identically; the API's polymorphic fields and the search/limit quirk are encoded once in the shared script.
+
 ## 2.6.0
 
 Optional `Workflow`-tool fast path for `/deepen` Phase 3 ("Design It Twice"), a light summary mode for `/extract`, plus small post-Opus-4.8 housekeeping. The prose `Agent` fan-out stays the default and fallback — the `Workflow` tool (Dynamic Workflows) is research-preview and plan-gated.
