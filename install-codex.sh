@@ -11,7 +11,7 @@ set -euo pipefail
 PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST_ROOT="$HOME/.codex/skills"
 
-for skill in cleanup clarify extract diagnose deepen; do
+for skill in cleanup clarify extract diagnose deepen svgl; do
   src_codex="$PLUGIN_ROOT/skills-codex/$skill/SKILL.md"
   src_claude_dir="$PLUGIN_ROOT/skills/$skill"
   dst="$DEST_ROOT/$skill"
