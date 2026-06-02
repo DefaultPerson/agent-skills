@@ -13,7 +13,7 @@ when_to_use: >
   five minutes. The skill enforces feedback-loop construction before
   hypothesising, which is the cheapest place to be wrong. Do NOT use
   for trivial typos, immediately-obvious errors, or feature work.
-allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, AskUserQuestion]
+allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, AskUserQuestion]
 ---
 
 # Diagnose

@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.6.0
+
+Optional `Workflow`-tool fast path for `/deepen` Phase 3 ("Design It Twice"), a light summary mode for `/extract`, plus small post-Opus-4.8 housekeeping. The prose `Agent` fan-out stays the default and fallback — the `Workflow` tool (Dynamic Workflows) is research-preview and plan-gated.
+
+### Added
+
+- **`skills/deepen/workflows/design-twice.workflow.js`** — optional Claude-only fast path for Phase 3's parallel interface exploration. Runs the 3 (or 4) design briefs as a schema-validated `parallel()` fan-out; the output schema mirrors the step-2 contract in `references/parallel-interface-design.md` (interface / usage / hidden / dependencies / trade-offs). The main loop renders the briefs and synthesises the recommendation; the script only fans them out and validates. **Not symlinked into Codex** — `install-codex.sh` is unchanged (`workflows/` is deliberately outside its `roles scripts references` loop; the Codex variant has no `Workflow` tool and keeps its `codex exec -` fan-out).
+- **`/extract` light mode (`--light`)** — a summary mode chosen interactively at the start (step 0) or via the `--light` flag. Instead of extracting full content into `extracted/`, it writes a one-line gist of each link **inline** next to the URL (`→ _<summary>_`), with reference-triage relaxed (summarise all). New shared script **`skills/extract/scripts/summarize-url.sh`** does a lightweight, no-download metadata fetch (YouTube via `yt-dlp -J`; Telegram via embed-page preview; HTML via `<title>` + meta description) and prints labelled metadata or an `ERROR:` line; the model condenses it to one sentence and is told never to fabricate when a fetch fails. No `extracted/` tree, no `.gitignore` change. Both Claude and Codex variants updated (Codex uses a numbered TUI prompt for the mode gate); the script is shared via the existing `scripts/` symlink, so `install-codex.sh` is unchanged.
+
+### Changed
+
+- **`/deepen` `allowed-tools`** gains `Workflow`; Phase 3 step 1 gains a "Fast path (optional)" paragraph describing the `Workflow` invocation, graceful degradation (fewer than `briefs.length` designs → synthesise from what returned; <2 → retry once or fall back), and the `Agent` default/fallback. Steps 2-3 (output contract + synthesis) are identical on both paths. Codex variant untouched.
+- **`/diagnose` `allowed-tools`** drops `Agent` — `/diagnose` is a solo discipline with no fan-out (the Codex variant already omitted it). Drift reduction.
+- **README** gains a "Local install (no marketplace)" snippet — symlink each skill directory into `~/.claude/skills/` (mirrors the Codex installer).
+
+### Why
+
+Dynamic Workflows (Claude Code v2.1.154, shipped with Opus 4.8) gives schema-validated parallel fan-out. `/deepen` Phase 3 is the one clean fit in this repo: a post-user-gate fan-out of independent design agents, with no cross-stage scripts, no lossless contract, and prose-for-a-human output — a dropped agent degrades to one fewer design, not lost data.
+
+`/cleanup` was evaluated and **deliberately excluded**. Its gap-detection fan-out feeds a lossless guarantee, reuses byte-exact text-output roles shared with the Codex variant (`gap-detector.md`, `coverage-verifier.md`), and `parallel()`'s null-on-failure would turn a visibly-waiting worker into a silent "no gaps" — a regression for a lossless tool. The win there (parallel + schema inside an already-decided fan-out) does not justify the added lossless hazard, the schema-vs-shared-text drift, and a second lossless implementation maintained for a plan-gated feature.
+
+`Workflow` stays opt-in with a mandatory prose fallback because it is research-preview and plan-gated: the `Agent` path is what most runs use.
+
 ## 2.5.0
 
 Two new skills (`/diagnose`, `/deepen`) plus three discipline upgrades baked into `/clarify`: tracer-bullet vertical slices, behavioural AC, optional HITL/AFK marker. `.out-of-scope/` knowledge base added as a Phase 5 Scope-cut audit option.

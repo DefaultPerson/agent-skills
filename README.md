@@ -24,7 +24,7 @@ The `/to-prd` seam (if installed separately) wraps the enriched spec as a PRD an
 ## Skills
 
 - **`/cleanup`** — losslessly reorganize a messy notes/plan/chat dump into a clean sectioned markdown file. Three-level gap detection (deterministic URL check + per-section semantic agents + fuzzy coverage net) proves nothing was lost. Multi-file input → multi-file output (per-source pipelines, not merged).
-- **`/extract`** — pull content out of every URL in a notes file (YouTube subtitles via yt-dlp, public Telegram via embed-page scrape, HTML via pandoc/curl). Replaces each URL with a local pointer, preserves originals, gitignores extracted content.
+- **`/extract`** — pull content out of every URL in a notes file (YouTube subtitles via yt-dlp, public Telegram via embed-page scrape, HTML via pandoc/curl). Replaces each URL with a local pointer, preserves originals, gitignores extracted content. **Light mode** (`--light`, or chosen interactively at the start) skips full extraction and instead writes a one-line gist of each link inline next to the URL — fast triage for URL-heavy notes, no `extracted/` tree.
 - **`/clarify`** — turn a clean spec into an implementation-ready document: atomic vertical-slice tasks (each cuts schema/API/UI/tests end-to-end) with behavioural Given/When/Then AC, shell-runnable proof commands, contracts (FR-NNN with MUST/SHOULD/MAY), edge cases, risks. Reads existing `docs/adr/*.md` and offers to write new ADRs for hard-to-reverse decisions surfaced during decomposition (cap 3 per run, all 3 criteria must hold). Phase 5 Scope-cut audit can record firm rejections to `.out-of-scope/<concept>.md`. Cross-model consensus loop with Codex (optional) catches issues single-model self-review misses.
 
 Two orthogonal skills (independent of the main flow):
@@ -62,6 +62,18 @@ Each skill follows the same template — `description` states triggers and trade
 ```bash
 /plugin marketplace add DefaultPerson/agent-skills
 /plugin install agent-skills@agent-skills
+```
+
+**Local install (no marketplace).** Claude Code auto-discovers skills in `~/.claude/skills/` — symlink each skill directory (its `roles/`, `references/`, `scripts/` travel with it):
+
+```bash
+PLUGIN_ROOT="${HOME}/.local/share/agent-skills"
+git clone https://github.com/DefaultPerson/agent-skills.git "$PLUGIN_ROOT" 2>/dev/null \
+  || git -C "$PLUGIN_ROOT" pull --ff-only
+for s in cleanup clarify extract diagnose deepen; do
+  ln -sfn "$PLUGIN_ROOT/skills/$s" "$HOME/.claude/skills/$s"
+done
+# Restart your session — skills load on startup.
 ```
 
 Optional (for `/clarify` Phase 7.6 cross-model consensus): install the [Codex CLI](https://github.com/openai/codex):
@@ -109,7 +121,7 @@ When Codex ships native `codex plugin install`, this section will be replaced wi
 ## Prerequisites
 
 - **Required:** Git, `bash`, `jq`, `python3`.
-- **`/extract` deps** (probed at runtime, install prompt if missing): `yt-dlp` (YouTube subtitles), `pandoc` (HTML — optional, falls back to crude curl). Telegram works with just `curl`.
+- **`/extract` deps** (probed at runtime, install prompt if missing): `yt-dlp` (YouTube subtitles), `pandoc` (HTML — optional, falls back to crude curl). Telegram works with just `curl`. **Light mode** needs only `curl` (+ `yt-dlp` for YouTube metadata); no `pandoc`.
 - **`/clarify` Phase 7.6 optional:**
   - In **Claude Code**: [Codex CLI](https://github.com/openai/codex) (`npm install -g @openai/codex`) — Claude variant uses `codex review --uncommitted` as the cross-model reviewer.
   - In **Codex CLI**: [Claude Code CLI](https://docs.claude.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`) — Codex variant uses `claude -p` as the cross-model reviewer.

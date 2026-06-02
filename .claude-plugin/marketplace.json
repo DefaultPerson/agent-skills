@@ -8,7 +8,7 @@
       "name": "agent-skills",
       "source": "./",
       "description": "Notes cleanup + spec enrichment with verifiable AC + URL extraction (YouTube/Telegram/HTML) + disciplined debug loop + Ousterhout deepening refactors.",
-      "version": "2.5.0",
+      "version": "2.6.0",
       "category": "development",
       "keywords": ["cleanup", "clarify", "spec", "extract", "notes", "youtube", "telegram", "diagnose", "debug", "deepen", "refactor", "architecture"]
     }
