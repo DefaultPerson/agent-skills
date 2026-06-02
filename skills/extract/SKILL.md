@@ -29,10 +29,12 @@ Pull content out of every URL in a notes file (YouTube subtitles, Telegram post 
 ## Usage
 
 ```
-/extract <note.md> [--force]
+/extract <note.md> [--force] [--light | --full]
 ```
 
 `--force` re-processes URLs even if they're already annotated (default: skip already-annotated).
+
+`--light` writes a one-line summary of each link's gist **inline** next to the URL (no `extracted/` tree); `--full` (default) extracts full content into `extracted/`. If neither flag is given, the skill asks which mode at the start (step 0).
 
 ## Weaknesses and when NOT to use
 
@@ -42,6 +44,7 @@ Pull content out of every URL in a notes file (YouTube subtitles, Telegram post 
 - **Long YouTube videos (>2h, ~30k words).** Extract will succeed, but downstream work (cleanup) may choke on the volume. Pre-trim manually if needed.
 - **JS-heavy SPA sites.** `extract-html.sh` uses curl — JS is not executed. You'll get the page skeleton without content. Use it for blog posts, articles, docs, NOT for interactive web apps.
 - **Heuristic reference-detection is imperfect.** Notes often contain URLs that aren't content to extract — API doc landing pages, GitHub repo roots, citation-style references, tool homepages. The skill flags them via heuristics in step 1 and surfaces a triage prompt in step 2 (default = skip). What looks like a "tool homepage" might be content the user wants (e.g. a project's blog) — the call is always handed to the user, never silently dropped.
+- **Light mode is best-effort metadata, not content.** `--light` writes a one-line gist (from title / description / Telegram post-preview) next to each URL — fast, no `extracted/` tree. It does NOT bring content offline; for JS-SPA / paywalled / private URLs the metadata is thin or missing (the summary must say so, never fabricate). Use `--full` (default) when downstream `/cleanup` / `/clarify` need the actual content.
 
 ## How to do it wrong vs right
 
@@ -94,8 +97,11 @@ Scripts in `scripts/` are building blocks; the skill calls them via Bash:
 | `extract-youtube.sh` | yt-dlp wrapper, subtitle cleanup | `<url> <output-dir>` |
 | `extract-telegram.sh` | public Telegram embed-page scrape | `<url> <output-dir>` |
 | `extract-html.sh` | pandoc / curl fallback | `<url> <output-dir>` |
+| `summarize-url.sh` | light-mode metadata fetch, no download (prints `TITLE`/`DESC`/`TEXT`… or `ERROR:`) | `<url>` |
 
 ## What the skill does (step by step)
+
+0. **Pick the mode** (gate — skip if `--light` or `--full` was passed). `AskUserQuestion`: **Full extraction** (default, recommended — full content into `extracted/`, local pointers next to each URL) vs **Light summaries** (one-line gist inline next to each URL, nothing written to `extracted/`). Steps 1-7 below are **Full mode**; for **Light mode**, do step 1's URL detection then jump to the `## Light mode (summaries)` section.
 
 1. **Read the note, find URLs.** Regex `https?://[^\s)]+` (with trailing-punctuation strip). Classify each URL:
    - **`youtube`** — `youtube.com/watch?v=*` or `youtu.be/*` (specific video).
@@ -127,6 +133,25 @@ Scripts in `scripts/` are building blocks; the skill calls them via Bash:
    ```
 7. **Final report + commit.** One line per URL with state `extracted` / `error` / `skipped(reference)` / `skipped(user)` plus aggregate metrics. Auto-commit `extract: <N> URLs from <note>` (only processed files, not the whole branch).
 
+## Light mode (summaries)
+
+`--light`, or the step-0 choice. Same URL detection as step 1, then for **every** URL (reference-triage is relaxed — a one-liner on a repo root or docs page is cheap and useful, so summarise all, don't skip references):
+
+1. **Probe deps (light).** Only `curl` (almost always present) is required; `yt-dlp` is needed only if YouTube URLs exist (`pandoc` is NOT — light mode never converts full HTML). Same install gate as Full step 3, but skip it when there are no YouTube URLs.
+2. **Fetch metadata.** `bash scripts/summarize-url.sh <url>` — prints labelled metadata (`TITLE` / `UPLOADER` / `DURATION` / `TEXT` / `DESC`) or an `ERROR: <reason>` line. No full-content download, nothing written to disk.
+3. **Condense to one line.** From that metadata, write a single plain-language sentence — *what the link is and why it's likely here* — aim for ≤ ~140 chars. If the script returned `ERROR:` (private / JS-SPA / fetch failed) or only thin metadata, say so honestly (e.g. `_(Telegram post — preview unavailable)_`). **Never invent content you didn't fetch.**
+4. **Annotate inline.** Append `→ _<summary>_` directly after the URL (italic, no link). Original URL preserved. Idempotent: skip URLs already annotated with `→ _…_` unless `--force`.
+5. **Report + commit.** One line per URL: `summarised` / `error (reason)` + aggregate. Commit `extract: summarise <N> URLs from <note>`. **No `extracted/` tree, no `.gitignore` change.**
+
+Light mode is for orientation/triage of URL-heavy notes (e.g. a backlog). It does NOT bring content offline — switch to Full mode when `/cleanup` / `/clarify` need the actual text.
+
+### Light mode — wrong vs right
+
+❌ **Wrong:** `summarize-url.sh` returns `ERROR: telegram post not accessible`; you write a plausible-sounding summary from the channel name anyway.
+- That's fabricating content you never fetched — the whole point of a summary is that it's grounded.
+
+✅ **Right:** Write `→ _(Telegram post — preview unavailable: private or deleted)_` and count it as `error` in the report. The user decides whether to open it manually.
+
 ## Outputs
 
 Per processed note (anchored at `<note-dir>/extracted/<note-basename>/`):
@@ -152,6 +177,8 @@ Multi-note layout in one directory (single shared parent):
 Git:
 - `.gitignore` — `extracted/` added
 - Commit: `extract: <N> URLs from <note>` (encompasses note edit + .gitignore; the contents of `extracted/` are gitignored)
+
+**Light mode** (`--light`): no `extracted/` tree and no `.gitignore` change — only the note is modified, with `→ _<summary>_` appended next to each URL. Commit: `extract: summarise <N> URLs from <note>`.
 
 ## Connections to other skills
 
@@ -185,5 +212,6 @@ Would this result pass review by a senior engineer? Concretely:
 - Does the commit message reflect actual work — `extract: N URLs from <note>`?
 - Does the final report enumerate every URL with state (`extracted` / `error` / `skipped(reference)` / `skipped(user)`)?
 - No leaked secrets in `extracted/` (auth tokens from API responses, personal data)?
+- **(Light mode)** Every URL got either a one-line summary or an explicit `error`; thin/failed fetches are flagged honestly (not fabricated); no `extracted/` tree or `.gitignore` change was made?
 
 If "no" on any item — redo, don't ship.

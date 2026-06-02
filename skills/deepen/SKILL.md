@@ -14,7 +14,7 @@ when_to_use: >
   is a small list of deepening opportunities + (on demand) 2-3 parallel
   interface designs. Do NOT use for green-field code (no architecture
   yet) or for one-off bug fixes (use /diagnose).
-allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, AskUserQuestion]
+allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, Workflow, AskUserQuestion]
 ---
 
 # Deepen
@@ -95,6 +95,8 @@ If the user picks a candidate, offer parallel interface exploration via `referen
    - Agent C: "Optimise for the most common caller — make the default case trivial."
 2. Each returns: interface (types + invariants + error modes + ordering), usage example, what's hidden behind the seam, dependency strategy + adapters, trade-offs.
 3. Present sequentially, then compare in prose. Recommend one (or a hybrid).
+
+**Fast path (optional).** If the `Workflow` tool is available, run the same parallel fan-out (step 1) via `Workflow({scriptPath: "workflows/design-twice.workflow.js", args: {briefs}})`, where `briefs = [{label, prompt}, ...]` are rendered from `references/parallel-interface-design.md` plus the chosen candidate. It returns the five-field design output (interface / usage / hidden / dependencies / trade-offs) schema-validated. The `Agent(subagent_type="general-purpose")` spawn above is the **default and fallback** — use it whenever `Workflow` is unavailable (it is research-preview and plan-gated, so the `Agent` path is what most runs use). If fewer than `briefs.length` designs come back (an agent failed), note the count and synthesise from what returned (≥2 is enough); with <2, retry the briefs once or fall back to the `Agent` path. Steps 2-3 (the output contract and the compare/recommend synthesis) are identical on both paths. If `scriptPath` does not resolve at runtime, pass the script via `script:` instead.
 
 Skip Phase 3 if the user wants only the candidate list, or if the shape of the deepening is already obvious.
 
