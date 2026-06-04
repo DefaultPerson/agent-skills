@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.7.1
+
+Bugfix for `/svgl`, found by end-to-end testing: a search with no matches now reports a clean "not found" instead of a raw HTTP 404.
+
+### Fixed
+
+- **`scripts/svgl.sh`** — svgl returns **HTTP 404** (`{"error":"…SVG not found"}`) for a zero-match `search`/`category`. The script now normalises that to an empty result (`[]`), so `/svgl <miss>` — e.g. `nextjs`, which doesn't substring-match `Next.js` — reports "not found" instead of a scary `HTTP 404`. Also: retry HTTP 429 (throttling) with growing backoff, and reject non-JSON responses cleanly instead of leaking a throttle/Cloudflare page into `jq`.
+
+### Changed
+
+- **`/svgl` Weaknesses** (both variants) — note that `search` is a literal case-insensitive substring (`nextjs` ≠ `Next.js`; use `next`) and that a no-match query is a clean "not found".
+
 ## 2.7.0
 
 New `/svgl` skill — fetch SVG brand/tech logos from the svgl.app public API straight into a project. Dual variant (Claude + Codex), dependency-light (curl + jq, both already required).

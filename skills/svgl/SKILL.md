@@ -48,6 +48,7 @@ Flags:
 - **Undocumented rate limit.** The API has no published limit; large `--all` batches may hit HTTP 429. `scripts/svgl.sh` retries once with backoff per request — for big category dumps, expect it to be slow, and prefer `--limit`.
 - **Public logos only.** No auth; private/internal brand kits are out of scope.
 - **svgl API quirk (handled):** the API `limit` param is **ignored when combined with `search` or `/category`** (it silently returns the unfiltered list). `scripts/svgl.sh` therefore never sends `limit` to those endpoints and slices client-side. Don't "fix" this by adding `&limit=` to a search URL — it breaks the search.
+- **Literal substring search.** `search` matches the title as a case-insensitive substring, so `nextjs` does NOT match `Next.js` (the dot breaks it) — use `next`. A no-match query is a clean "not found": svgl signals zero results with HTTP 404, which `scripts/svgl.sh` normalises to an empty result (so it never surfaces as a scary error).
 - **Not an SVG optimiser/editor.** It downloads files as-is from svgl's CDN.
 
 ## How to do it wrong vs right

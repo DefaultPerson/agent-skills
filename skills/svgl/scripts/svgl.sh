@@ -17,16 +17,22 @@ API="https://api.svgl.app"
 UA="agent-skills-svgl/1.0"
 
 # GET <path-and-query> -> JSON on stdout; non-zero + stderr on hard failure.
+# Notes on svgl's behaviour:
+#   - a search/category with no matches returns HTTP 404 + {"error": "...SVG not found"};
+#     that's "no results", not a failure -> we emit an empty array `[]`.
+#   - rapid calls can be throttled (HTTP 429, or a non-JSON challenge page);
+#     retry 429 with growing backoff and reject any non-JSON 200 body cleanly.
 api_get() {
-  local url="$API$1" body code
-  body="$(curl -s -A "$UA" --max-time 25 -w $'\n%{http_code}' "$url")" || { echo "ERROR: curl failed for $url" >&2; return 1; }
-  code="${body##*$'\n'}"; body="${body%$'\n'*}"
-  if [ "$code" = "429" ]; then
-    sleep 1.5
+  local url="$API$1" body code tries=0
+  while :; do
     body="$(curl -s -A "$UA" --max-time 25 -w $'\n%{http_code}' "$url")" || { echo "ERROR: curl failed for $url" >&2; return 1; }
     code="${body##*$'\n'}"; body="${body%$'\n'*}"
-  fi
+    if [ "$code" = "429" ] && [ "$tries" -lt 2 ]; then tries=$((tries + 1)); sleep "$((tries * 2))"; continue; fi
+    break
+  done
+  [ "$code" = "404" ] && { printf '[]'; return 0; }   # no matches
   [ "$code" = "200" ] || { echo "ERROR: HTTP $code for $url" >&2; return 1; }
+  printf '%s' "$body" | jq empty >/dev/null 2>&1 || { echo "ERROR: non-JSON response (throttled?) for $url" >&2; return 1; }
   printf '%s' "$body"
 }
 
