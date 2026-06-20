@@ -1,6 +1,21 @@
 ---
-description: Autonomous watch-fix-deploy loop for a running service. Polls logs every N minutes via the native /loop; on trouble it delegates a minimal fix to a sub-agent (context economy), deploys, and re-checks — repeating until you stop it. Escalates with a 30s-repeating sound + desktop notification only when it is genuinely stuck or a change is unsafe. Claude Code only.
-argument-hint: "[stop | status | resume | <setup notes>]"
+name: babysit
+description: >
+  Autonomous watch → fix → deploy → recheck LOOP for a running service: every N
+  minutes it reads only NEW logs and, on trouble, delegates a bounded fix to a
+  sub-agent, ships it via your `deploy_cmd` (or a deploy MCP), and verifies —
+  repeating until you stop it. Escalates with a repeating sound + desktop
+  notification only when stuck or a change is unsafe. Use ONLY when the user
+  explicitly wants this ongoing UNATTENDED loop — not a one-off log read, health
+  check, or single fix. Claude Code only (needs the native /loop). Triggers:
+  "/babysit", "babysit the service", "watch and auto-fix/deploy", "keep the
+  service healthy unattended", "присматривай за сервисом".
+when_to_use: >
+  The user wants a running service kept healthy unattended OVER TIME via a
+  repeating fix-and-deploy loop, in an environment where a bad deploy is
+  recoverable. NOT for a one-off log read / health check / single bug fix (use a
+  normal agent), and NOT a monitoring/paging system. Claude Code only — it needs
+  the native /loop cadence, the Agent tool, and a way to deploy.
 ---
 
 # /babysit — autonomous watch · fix · deploy · re-check loop
@@ -10,11 +25,26 @@ logs**, decide healthy-or-not, and — if not — hand a bounded fix to a sub-ag
 deploy it, and verify. Loop until you cancel. Call you (sound every 30s) **only**
 when stuck or when a change is too risky to make unattended.
 
+> **Claude Code only.** This skill needs the native `/loop` cadence, the `Agent`
+> tool, and (optionally) a deploy MCP. Codex has no in-session loop primitive, so
+> there is no Codex variant — on Codex, drive a single `/babysit` tick from an
+> external cron + `codex exec` instead.
+
 > **Letter = spirit.** If a rule blocks you from reaching the goal it was written
 > for, the rule is wrong, not the goal. Don't look for a wording loophole — ask
 > what the rule protects, and protect that. Here the goal is: keep the service
 > healthy *without* surprising the operator. When in doubt, escalate; never
 > deploy a guess.
+
+## Deploy / log adapter (platform-agnostic)
+
+babysit talks to your service through **two shell commands** — nothing platform-specific is assumed:
+
+- **`log_cmd`** — prints recent logs to stdout. Examples: `ssh prod 'journalctl -u app --since "-6min" --no-pager'`, `docker logs --since 6m <c>`, `kubectl logs --since=6m deploy/app`, `tail -n 200 /var/log/app.log`.
+- **`deploy_cmd`** — ships the committed fix. Examples: `git push deploy main`, `make deploy`, `flyctl deploy`, `kubectl rollout restart deploy/app`.
+- **`rollback_cmd`** *(optional)* — one-step undo. Examples: `git revert HEAD && git push deploy main`, re-deploy the prior good build. If absent, babysit escalates instead of auto-undoing.
+
+If you happen to run a platform with an MCP (e.g. **coolify**, or any other), you may point these at MCP tools instead of shell — resolve the app/resource id once at setup, and note which tool fetches logs, which deploys, and how to poll a deploy to a terminal state. The adapter is the contract; the backend is your choice.
 
 ## Weaknesses and when NOT to use
 
@@ -49,7 +79,7 @@ Mode is chosen at setup and stored in `config.json`; `/babysit resume` keeps it.
 
 ```
 .babysit/
-  config.json     # log source, trouble-definition, deploy target, interval, mode, guardrails
+  config.json     # log_cmd, trouble-definition, deploy_cmd, interval, mode, guardrails
   state.json      # iteration #, log cursor, open incidents, per-signature fix attempts, deploy history, status
   babysit.log     # append-only audit trail (one line per event)
   incidents/      # one file per escalation: logs excerpt + classification + agent summary + deploy result
@@ -79,7 +109,8 @@ logged once at boot doesn't re-trigger every tick.
 
 ## Phase 0 — Resolve what to do
 
-Read the literal arg in **$ARGUMENTS**, then:
+Read the argument the skill was invoked with (the text after `/babysit`, or the
+user's stated intent), then:
 
 - `stop` → **STOP** (below). `status` → **STATUS**. `resume` → re-arm an existing config.
 - No `.babysit/config.json` → **SETUP** (first run).
@@ -87,20 +118,18 @@ Read the literal arg in **$ARGUMENTS**, then:
 
 ## Phase 1 — SETUP (first run only)
 
-1. **Gather config.** Prefer parsing `$ARGUMENTS` / nearby notes; ask only what's
+1. **Gather config.** Prefer parsing the invocation / nearby notes; ask only what's
    missing, via **one** `AskUserQuestion` (≤4 questions, don't interrogate):
    - `project_dir` — repo to fix in (default: cwd).
-   - `log_source` — **either** `coolify` (resolve the app via the coolify MCP:
-     `list_applications` → confirm the `uuid`; fetch with `application_logs`),
-     **or** `log_cmd` — a shell command that prints recent logs
-     (`ssh prod 'journalctl -u app --since "-6min" --no-pager'`,
-     `docker logs --since 6m <c>`, `kubectl logs --since=6m …`, `tail`ing a file).
+   - `log_cmd` — a shell command that prints recent logs (see the adapter section).
+     If using a logs MCP instead, resolve the app/resource id once and note the tool.
    - `health_cmd` and/or `health_url` — optional but strongly recommended; it's
      the cheapest, least-ambiguous signal and the post-deploy verifier.
    - `trouble_definition` — patterns / thresholds (see above). Get something
      concrete; a vague definition is the #1 failure mode.
-   - `deploy` — **either** `coolify` (the app `uuid`; deploy via the coolify MCP
-     `deploy`), **or** `deploy_cmd` (e.g. `git push deploy main`, `make deploy`).
+   - `deploy_cmd` — the shell command that ships a fix (see the adapter section).
+     If using a deploy MCP instead, note the resource id, the deploy tool, and how
+     to poll it to a terminal state. Optionally `rollback_cmd`.
    - `commit_branch` — branch the fix is committed to (default: current branch).
      Heed the global rule about not committing to `main` *unless* `main` is the
      deploy branch — for a prod hotfix loop it often is; confirm, don't assume.
@@ -131,7 +160,7 @@ Read the literal arg in **$ARGUMENTS**, then:
 Keep this tick **cheap and shallow** — its job is triage, not investigation.
 
 1. **Load** `config.json` + `state.json` from disk. `iteration++`.
-2. **Fetch only new logs** since `state.log_cursor`; advance the cursor.
+2. **Fetch only new logs** since `state.log_cursor` (run `log_cmd`); advance the cursor.
    Run `health_cmd`/`health_url` if configured.
    - **Signal unreachable** (logs error AND no health signal): `blind_ticks++`.
      If `blind_ticks ≥ max_blind_ticks` → **ESCALATE** ("can't observe"). Else
@@ -181,17 +210,17 @@ in the sub-agent's context and is discarded — the babysitter stays light.
   (`status:"pending-approval"`, stash the commit sha). Deploy only after the
   operator approves on a later tick.
 - **mode = full-auto** and `fixed:true`, `confidence:med|high` → **DEPLOY**:
-  trigger the coolify `deploy` (poll `deployment` until terminal) or run
-  `deploy_cmd`. Record `{ts, sig, commit, result}` in `state.deploys`.
+  run `deploy_cmd` (or your deploy MCP's deploy, polled to a terminal state).
+  Record `{ts, sig, commit, result}` in `state.deploys`.
   - **Verify** (the deploy isn't done until it's verified): wait for it to
     settle, fetch fresh logs + health.
     - **Healthy** → mark incident resolved, `signatures[sig].fix_attempts++`
       stays as the count that worked; clear status. 🎉
     - **Still broken / worse than baseline** → `signatures[sig].fix_attempts++`;
       if now `≥ max_fix_attempts` → **ESCALATE** ("fix didn't hold") and, if a
-      one-click rollback exists (coolify: redeploy the prior successful
-      deployment), **roll back** and say so. If no safe rollback, escalate
-      loudly and stop touching prod.
+      one-step rollback exists (`rollback_cmd` / re-deploy the prior good build),
+      **roll back** and say so. If no safe rollback, escalate loudly and stop
+      touching prod.
 
 ## ESCALATE — "call me until I come"
 

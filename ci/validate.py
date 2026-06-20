@@ -32,6 +32,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 FUNCTIONAL_DIRS = ["skills", "skills-codex", "agents", "commands"]
 DESC_CAP = 1024  # Claude Code rejects skill/agent descriptions longer than this at load.
+# Skills that exist ONLY in the Claude tree (no Codex variant) — e.g. babysit
+# needs the native /loop, which Codex lacks. Exempt from skills↔skills-codex parity.
+CLAUDE_ONLY = {"babysit"}
 
 failures = []
 checks = 0
@@ -167,8 +170,10 @@ if cmkt and plugin_name:
 section("skills ↔ skills-codex ↔ install-codex.sh parity")
 sk = {p.name for p in (ROOT / "skills").iterdir() if p.is_dir() and not p.name.startswith(".")}
 ck = {p.name for p in (ROOT / "skills-codex").iterdir() if p.is_dir() and not p.name.startswith(".")}
-record(sk == ck, "same skill set in skills/ and skills-codex/",
-       (f"claude-only: {sorted(sk - ck)} | codex-only: {sorted(ck - sk)}") if sk != ck else f"{len(sk)} skills")
+record((sk - CLAUDE_ONLY) == ck, "skills-codex/ mirrors skills/ (Claude-only exempt)",
+       (f"claude-only-extra: {sorted((sk - CLAUDE_ONLY) - ck)} | codex-only: {sorted(ck - (sk - CLAUDE_ONLY))}") if (sk - CLAUDE_ONLY) != ck else f"{len(ck)} shared skills")
+record(CLAUDE_ONLY <= sk and not (CLAUDE_ONLY & ck), "Claude-only skills present in skills/, absent from skills-codex/",
+       f"{sorted(CLAUDE_ONLY)} | missing-from-skills: {sorted(CLAUDE_ONLY - sk)} | leaked-into-codex: {sorted(CLAUDE_ONLY & ck)}")
 
 sh_path = ROOT / "install-codex.sh"
 sh_text = read(sh_path) if sh_path.exists() else ""

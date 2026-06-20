@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — 2026-06-20
+
+`/babysit` moved from a command to a **Claude-only skill** — Claude can now invoke
+it itself (still `/babysit`-typeable), with a tightly-scoped description so it only
+fires on explicit watch-fix-deploy-loop intent. Its deploy/log adapter is now
+platform-agnostic: any `log_cmd` / `deploy_cmd` (coolify or any platform MCP is one
+option, nothing hard-coded). No Codex variant (Codex lacks `/loop`); the validator
+gained a Claude-only allowlist.
+
 ## 0.3.0 — 2026-06-20
 
 Removed `/diagnose` and `/deepen` (outside the core flow, unused). Renamed `/accept`
