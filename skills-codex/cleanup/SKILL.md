@@ -41,7 +41,7 @@ Multi-file: each input is processed independently end-to-end. Output is N cleane
 - **Context cost grows linearly with input size.** Phase 4 (gap detection) spawns subprocess agents on large files — watch your budget. For files >2000 lines, consider splitting the input.
 - **Slower than Claude variant.** Codex doesn't have an in-process `Agent` tool; gap-detection in Phase 4b/4c/8 runs as sequential `codex exec` subprocesses (or `xargs -P N` parallel if your shell supports it). Correctness is identical; latency is higher.
 - **Does not work with non-markdown formats.** JSON/YAML/code dumps — use a different tool.
-- **Does not extract content from links** (YouTube, Telegram). For that, run `/extract` before `/cleanup`.
+- **Does not extract content from links** (YouTube, Telegram). For that, run `/extract-links` before `/cleanup`.
 - **Does not summarize.** This skill is preservation-first; if you want to shrink ideas, use a different tool (e.g. `mattpocock:to-prd` for PRD-style summarization).
 - **Non-interactive mode (`codex exec`).** Step 6 needs a "ready" signal from the user after reviewing gaps. From `codex exec` without TTY, fail with an explicit error rather than auto-continuing — user must run from `codex` TUI.
 
@@ -143,7 +143,7 @@ Git: two commits per source — `pre-cleanup: <name>` (snapshot) and `cleanup: r
 
 ## Connections to other skills
 
-- **Input:** typically a raw file from notes/chat. Can be invoked standalone, or after `/extract` if the notes contain URLs.
+- **Input:** typically a raw file from notes/chat. Can be invoked standalone, or after `/extract-links` if the notes contain URLs.
 - **Output:** valid sectioned markdown without unresolved markers. What to do with it is the user's call (manual edit, `/blueprint`, `mattpocock:to-prd`, direct goal-feature input, etc.).
 - **Does not call** other skills automatically. After step 9: `Cleanup done. Run /clear before continuing.` — no downstream recommendation.
 

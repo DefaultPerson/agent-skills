@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 — 2026-06-20
+
+Removed `/diagnose` and `/deepen` (outside the core flow, unused). Renamed `/accept`
+→ `/verify-done` (clearer intent) and `/extract` → `/extract-links`. `/extract-links`
+now defaults to light (one-line inline summaries); pass `--full` for offline content
+extraction. README trimmed.
+
 ## 0.2.0 — 2026-06-20
 
 Native Codex CLI plugin packaging — `codex plugin marketplace add` + `codex plugin add`

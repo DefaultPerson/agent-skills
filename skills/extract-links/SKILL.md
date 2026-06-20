@@ -1,27 +1,26 @@
 ---
-name: extract
+name: extract-links
 description: >
   Use when a notes/plan file contains URLs (YouTube videos, Telegram posts,
-  articles) whose content needs to be brought into the workspace before
-  /cleanup or further analysis. Replaces each URL with a local pointer
-  to extracted text. Tradeoff: YouTube subtitles via yt-dlp, public
-  Telegram via embed-page scrape, generic HTML via pandoc/curl. Private
-  or auth-required resources are out of scope. For 1-2 URLs, copy-paste
-  is faster. Triggers: "extract", "/extract", "развернуть ссылки",
-  "expand links", "fetch URLs", "извлеки контент".
+  articles) and you want their gist available inside the file. By DEFAULT
+  writes a one-line summary inline next to each URL (light, fast triage);
+  pass --full to pull full content into a local extracted/ tree with pointers.
+  YouTube subtitles via yt-dlp, public Telegram via embed-page scrape, HTML
+  via pandoc/curl; private/auth resources are out of scope. For 1-2 URLs,
+  copy-paste is faster. Triggers: "/extract-links", "extract links",
+  "развернуть ссылки", "expand links", "fetch URLs", "извлеки контент".
 when_to_use: >
   Note has 3+ URLs and downstream work (/cleanup, /blueprint, mattpocock:to-prd,
   goal feature, manual analysis) needs the content available offline. Do NOT
   use for a single URL you can just open in browser, for private/auth-required
   resources, or when the user wants to keep the note as URL-references only.
-allowed-tools: [Bash, Read, Edit, Glob, Grep]
+disable-model-invocation: false
+allowed-tools: [Bash, Read, Edit, Glob, Grep, AskUserQuestion]
 ---
 
-# Extract (Codex variant)
+# Extract links
 
-Pull content out of every URL in a notes file (YouTube subtitles, Telegram post text, HTML articles) into a shared sibling `extracted/<note-basename>/` directory, replacing each URL with a local pointer. Processing multiple notes in the same directory consolidates under one `extracted/` parent.
-
-This is the **Codex CLI variant**. Behaviourally identical to the Claude Code variant — only the user-interaction idiom differs (numbered list TUI prompt instead of `AskUserQuestion` radio UI). All shared resources (`roles/`, `scripts/`) come from the Claude variant tree via install-time symlinks.
+Annotate every URL in a notes file with its content. **By default (light)** writes a one-line gist inline next to each URL — fast triage, nothing written to disk. With `--full`, pulls full content (YouTube subtitles, Telegram post text, HTML articles) into a shared sibling `extracted/<note-basename>/` directory, replacing each URL with a local pointer (multiple notes in one directory consolidate under a single `extracted/` parent).
 
 > **Letter = spirit.** If a rule blocks you from reaching the goal it was
 > written for, the rule is wrong, not the goal. Don't look for a wording
@@ -30,23 +29,22 @@ This is the **Codex CLI variant**. Behaviourally identical to the Claude Code va
 ## Usage
 
 ```
-/extract <note.md> [--force] [--light | --full]
+/extract-links <note.md> [--force] [--full | --light]
 ```
 
 `--force` re-processes URLs even if they're already annotated (default: skip already-annotated).
 
-`--light` writes a one-line summary of each link's gist **inline** next to the URL (no `extracted/` tree); `--full` (default) extracts full content into `extracted/`. If neither flag is given, the skill asks which mode at the start (step 0, numbered TUI prompt).
+**Light is the default**: a one-line summary of each link's gist written **inline** next to the URL, no `extracted/` tree — fast triage for URL-heavy notes. Pass `--full` to extract full content into `extracted/` with local pointers (use it when `/cleanup` / `/blueprint` need the actual text offline). `--light` is accepted explicitly too.
 
 ## Weaknesses and when NOT to use
 
 - **Does not work with private/auth resources.** Private Telegram channels, paywalled articles, logged-in-only pages — out of scope. Those URLs return an error in the final report.
-- **Depends on external tools (yt-dlp, pandoc).** If they're not installed, the skill prompts the user (numbered-list TUI prompt) to install. Never auto-installs without explicit OK. If the user declines — the matching URLs get an error. (Telegram embed-scrape needs only `curl`, which is almost always present.)
+- **Depends on external tools (yt-dlp, pandoc).** If they're not installed, the skill prompts the user to install via AskUserQuestion. Never auto-installs without explicit OK. If the user declines — the matching URLs get an error. (Telegram embed-scrape needs only `curl`, which is almost always present.)
 - **Overkill for 1-2 URLs.** Copy-paste is faster than the pipeline. Use it only with 3+ URLs.
 - **Long YouTube videos (>2h, ~30k words).** Extract will succeed, but downstream work (cleanup) may choke on the volume. Pre-trim manually if needed.
 - **JS-heavy SPA sites.** `extract-html.sh` uses curl — JS is not executed. You'll get the page skeleton without content. Use it for blog posts, articles, docs, NOT for interactive web apps.
 - **Heuristic reference-detection is imperfect.** Notes often contain URLs that aren't content to extract — API doc landing pages, GitHub repo roots, citation-style references, tool homepages. The skill flags them via heuristics in step 1 and surfaces a triage prompt in step 2 (default = skip). What looks like a "tool homepage" might be content the user wants (e.g. a project's blog) — the call is always handed to the user, never silently dropped.
 - **Light mode is best-effort metadata, not content.** `--light` writes a one-line gist (from title / description / Telegram post-preview) next to each URL — fast, no `extracted/` tree. It does NOT bring content offline; for JS-SPA / paywalled / private URLs the metadata is thin or missing (the summary must say so, never fabricate). Use `--full` (default) when downstream `/cleanup` / `/blueprint` need the actual content.
-- **Non-interactive mode (`codex exec`).** This skill needs user input for the dependency-install prompt (step 3) and reference triage (step 2). If invoked from `codex exec` without TTY, fail with an explicit error rather than silently auto-installing or auto-skipping. User must run from `codex` TUI.
 
 ## How to do it wrong vs right
 
@@ -57,15 +55,7 @@ This is the **Codex CLI variant**. Behaviourally identical to the Claude Code va
 - User might be on a shared system where pip is restricted.
 - The skill turned itself into an installer.
 
-✅ **Right:** Detect missing → print numbered options in TUI and wait for reply:
-```
-yt-dlp not found. How would you like to proceed?
-  1. Install yt-dlp now (recommended)
-  2. Skip YouTube URLs (they will be reported as errors)
-  3. Abort
-> _
-```
-Accept `1`, `2`, `3`, or text alias. Re-prompt on ambiguous reply. User-explicit only.
+✅ **Right:** Detect missing → AskUserQuestion: (1) "I'll install yt-dlp", (2) "Skip YouTube URLs", (3) "Abort". User-explicit only.
 
 ### URL annotation
 
@@ -85,7 +75,7 @@ See https://youtube.com/watch?v=abc → [./extracted/note/youtube-abc/subtitles.
 - Downstream `/cleanup` has to navigate around noise files that contain only navigation HTML.
 - The user's actual content (the other 8) gets diluted; signal-to-noise drops.
 
-✅ **Right:** Classify URLs in step 1. Detected `reference` URLs (bare hosts, `docs.*`, GitHub repo roots, package-registry landings, anchor-only fragments) are surfaced together in a single triage prompt (step 2): "These N URLs look like references, not content — skip all? Extract all anyway? Pick which?" Default = skip all. Skipped URLs appear in the final report so the user can audit the decision.
+✅ **Right:** Classify URLs in step 1. Detected `reference` URLs (bare hosts, `docs.*`, GitHub repo roots, package-registry landings, anchor-only fragments) are surfaced together in a single triage AskUserQuestion (step 2): "These N URLs look like references, not content — skip all? Extract all anyway? Pick which?" Default = skip all. Skipped URLs appear in the final report so the user can audit the decision.
 
 ### Multi-URL note
 
@@ -97,9 +87,9 @@ See https://youtube.com/watch?v=abc → [./extracted/note/youtube-abc/subtitles.
 
 ## Roles
 
-`roles/interactive-prompt.md` — prompt template for `other`-type URLs (not YouTube, not Telegram). Substitution: `{url_short}` (first 60 chars of the URL). Originally written for `AskUserQuestion` semantics; in Codex you render it as a numbered list in the TUI and accept a numeric or text reply.
+`roles/interactive-prompt.md` — AskUserQuestion format for `other`-type URLs (not YouTube, not Telegram). Substitution: `{url_short}` (first 60 chars of the URL).
 
-Scripts in `scripts/` are building blocks; the skill calls them via Bash (no Codex-specific changes — same shell scripts as Claude variant):
+Scripts in `scripts/` are building blocks; the skill calls them via Bash:
 
 | Script | Purpose | Args |
 |---|---|---|
@@ -109,16 +99,11 @@ Scripts in `scripts/` are building blocks; the skill calls them via Bash (no Cod
 | `extract-html.sh` | pandoc / curl fallback | `<url> <output-dir>` |
 | `summarize-url.sh` | light-mode metadata fetch, no download (prints `TITLE`/`DESC`/`TEXT`… or `ERROR:`) | `<url>` |
 
-## What the skill does (step by step)
+## Mode routing
 
-0. **Pick the mode** (gate — skip if `--light` or `--full` was passed). Numbered TUI prompt:
-   ```
-   How should links be processed?
-     1. Full extraction (recommended — full content into extracted/, local pointers)
-     2. Light summaries (one-line gist inline next to each URL, nothing written to extracted/)
-   > _
-   ```
-   Default = `1` on empty reply. Steps 1-7 below are **Full mode**; for **Light mode**, do step 1's URL detection then jump to the `## Light mode (summaries)` section.
+**Default is Light** (the `## Light mode` section below) — fast inline gists, nothing written to disk. Pass `--full` for the full extraction pipeline (steps 1-7 here). Both modes start from the same step-1 URL detection.
+
+## Full mode (`--full`) — step by step
 
 1. **Read the note, find URLs.** Regex `https?://[^\s)]+` (with trailing-punctuation strip). Classify each URL:
    - **`youtube`** — `youtube.com/watch?v=*` or `youtu.be/*` (specific video).
@@ -130,26 +115,17 @@ Scripts in `scripts/` are building blocks; the skill calls them via Bash (no Cod
      - package registry landings (`npmjs.com/package/*`, `pypi.org/project/*`, `crates.io/crates/*`, `rubygems.org/gems/*`),
      - anchor-only or fragment-only URLs (`#section-id`).
    - **`other`** — everything else (article, blog post, generic HTML).
-2. **Triage references with the user (if any detected).** Show a numbered list in the TUI:
-   ```
-   N URLs look like references, not content:
-     a) https://github.com/owner/repo  (GitHub repo root)
-     b) https://docs.python.org/        (docs landing)
-     ...
-   How to handle?
-     1. Skip all references (recommended — go into final report as skipped(reference))
-     2. Extract all anyway (re-classify each to `other` and run interactive prompt)
-     3. Pick which to extract (1-at-a-time prompts per URL)
-   > _
-   ```
-   Default = `1` if user just hits enter. Accept `1` / `2` / `3` or text alias. For option `3`, iterate per-URL prompts.
+2. **Triage references with the user (if any detected).** Single AskUserQuestion listing every `reference` URL plus its detected reason. Options (mutually exclusive):
+   1. **Skip all references** (default, recommended) — they go into the final report as `skipped(reference)`.
+   2. **Extract all anyway** — re-class each to `other` and run them through the interactive prompt.
+   3. **Pick which to extract** — fall through to per-URL prompts (1-at-a-time AskUserQuestion).
 
    If there are no `reference` URLs — skip this step silently.
-3. **Probe dependencies.** `bash scripts/install-deps.sh`. If a tool required for the URL types is missing — TUI numbered prompt (install / skip / abort). NEVER auto-install without explicit OK.
+3. **Probe dependencies.** `bash scripts/install-deps.sh`. If a tool required for the URL types is missing — AskUserQuestion (install / skip / abort). NEVER auto-install without explicit OK.
 4. **For each URL — extract.** Output root is `<note-dir>/extracted/<note-basename>/` — one shared `extracted/` per directory, per-note subfolder inside. For multi-note runs in the same directory, the parent is consolidated automatically.
    - YouTube → `bash scripts/extract-youtube.sh <url> <note-dir>/extracted/<note-basename>/<slug>/`
    - Telegram → `bash scripts/extract-telegram.sh <url> <note-dir>/extracted/<note-basename>/<slug>/`
-   - Other → render `roles/interactive-prompt.md` as numbered TUI prompt; accept reply. By choice: readable HTML / skip / custom command.
+   - Other → AskUserQuestion via `roles/interactive-prompt.md`. By choice: readable HTML / skip / custom command.
    - Slug: `<type>-<short-id>` (e.g. `youtube-dQw4w9WgXcQ`, `telegram-channel-123`, `html-blog-example-com`). Max 50 chars.
    - Errors (404, private, fetch fail) — log to `<note-dir>/extracted/<note-basename>/.errors.log`, do not annotate the URL, keep going.
 5. **Annotate the note.** For each SUCCESSFULLY extracted URL — append `→ [<local-path>](<local-path>)` right after the URL in the note. `<local-path>` is relative to the note: `./extracted/<note-basename>/<slug>/...`. Original URL preserved. Use the Edit tool, not Write. If a URL is already annotated (`→ [./...]` directly after) — skip unless `--force`. Triage-skipped URLs are NOT annotated.
@@ -157,17 +133,17 @@ Scripts in `scripts/` are building blocks; the skill calls them via Bash (no Cod
    ```bash
    grep -qxF 'extracted/' .gitignore 2>/dev/null || echo 'extracted/' >> .gitignore
    ```
-7. **Final report + commit.** One line per URL with state `extracted` / `error` / `skipped(reference)` / `skipped(user)` plus aggregate metrics. Auto-commit `extract: <N> URLs from <note>` (only processed files, not the whole branch).
+7. **Final report + commit.** One line per URL with state `extracted` / `error` / `skipped(reference)` / `skipped(user)` plus aggregate metrics. Auto-commit `extract-links: <N> URLs from <note>` (only processed files, not the whole branch).
 
-## Light mode (summaries)
+## Light mode (default)
 
-`--light`, or the step-0 choice. Same URL detection as step 1, then for **every** URL (reference-triage is relaxed — a one-liner on a repo root or docs page is cheap and useful, so summarise all, don't skip references):
+The default (or explicit `--light`). Same URL detection as Full step 1, then for **every** URL (reference-triage is relaxed — a one-liner on a repo root or docs page is cheap and useful, so summarise all, don't skip references):
 
-1. **Probe deps (light).** Only `curl` (almost always present) is required; `yt-dlp` is needed only if YouTube URLs exist (`pandoc` is NOT — light mode never converts full HTML). Same TUI install gate as Full step 3, but skip it when there are no YouTube URLs.
+1. **Probe deps (light).** Only `curl` (almost always present) is required; `yt-dlp` is needed only if YouTube URLs exist (`pandoc` is NOT — light mode never converts full HTML). Same install gate as Full step 3, but skip it when there are no YouTube URLs.
 2. **Fetch metadata.** `bash scripts/summarize-url.sh <url>` — prints labelled metadata (`TITLE` / `UPLOADER` / `DURATION` / `TEXT` / `DESC`) or an `ERROR: <reason>` line. No full-content download, nothing written to disk.
 3. **Condense to one line.** From that metadata, write a single plain-language sentence — *what the link is and why it's likely here* — aim for ≤ ~140 chars. If the script returned `ERROR:` (private / JS-SPA / fetch failed) or only thin metadata, say so honestly (e.g. `_(Telegram post — preview unavailable)_`). **Never invent content you didn't fetch.**
 4. **Annotate inline.** Append `→ _<summary>_` directly after the URL (italic, no link). Original URL preserved. Idempotent: skip URLs already annotated with `→ _…_` unless `--force`.
-5. **Report + commit.** One line per URL: `summarised` / `error (reason)` + aggregate. Commit `extract: summarise <N> URLs from <note>`. **No `extracted/` tree, no `.gitignore` change.**
+5. **Report + commit.** One line per URL: `summarised` / `error (reason)` + aggregate. Commit `extract-links: summarise <N> URLs from <note>`. **No `extracted/` tree, no `.gitignore` change.**
 
 Light mode is for orientation/triage of URL-heavy notes (e.g. a backlog). It does NOT bring content offline — switch to Full mode when `/cleanup` / `/blueprint` need the actual text.
 
@@ -202,15 +178,18 @@ Multi-note layout in one directory (single shared parent):
 
 Git:
 - `.gitignore` — `extracted/` added
-- Commit: `extract: <N> URLs from <note>` (encompasses note edit + .gitignore; the contents of `extracted/` are gitignored)
+- Commit: `extract-links: <N> URLs from <note>` (encompasses note edit + .gitignore; the contents of `extracted/` are gitignored)
 
-**Light mode** (`--light`): no `extracted/` tree and no `.gitignore` change — only the note is modified, with `→ _<summary>_` appended next to each URL. Commit: `extract: summarise <N> URLs from <note>`.
+**Light mode** (`--light`): no `extracted/` tree and no `.gitignore` change — only the note is modified, with `→ _<summary>_` appended next to each URL. Commit: `extract-links: summarise <N> URLs from <note>`.
 
 ## Connections to other skills
 
 - **Input:** any markdown file with URLs. Usually a note or plan before `/cleanup` or manual review.
-- **Output:** annotated note with local pointers. Suitable for `/cleanup`, `mattpocock:to-prd`, manual analysis, plain reading.
-- **Does not call** other skills automatically. After step 7: `Extracted N URLs from <note>. Run /cleanup next if needed.` — a soft hint for the typical pipeline, not a forced chain.
+- **Output:** annotated note with local pointers. Suitable for:
+  - `/cleanup` — now has offline copies for gap detection
+  - `mattpocock:to-prd` / manual analysis — content at hand
+  - plain reading — the user opens local files faster than a browser
+- **Does not call** other skills automatically. After step 6: `Extracted N URLs from <note>. Run /cleanup next if needed.` — a soft hint for the typical pipeline, not a forced chain.
 
 ## Rules
 
@@ -221,18 +200,18 @@ The note is a shared artifact. After extract, it'll be read by the user, downstr
 In step 1 you committed to classifying every URL (not just `youtube`/`telegram`/`other` — also `reference`). In step 2 you committed to surfacing every `reference` URL to the user before deciding its fate. In step 4 you committed to processing EVERY remaining URL — either extracted, or explicitly errored with reason. In step 5 you committed to preserving the original URL and appending the pointer (not replacing). In step 6 — idempotent `gitignore_add`. Skipping any step withdraws the basis for trusting the final report.
 
 ### Authority
-The skill exists precisely because extracting a dozen URLs by hand is slow and error-prone. If you silently skip "obviously irrelevant" URLs without prompting the user, you are judging content you haven't seen — that's the user's role, not yours. The `reference` heuristic in step 1 is a PROPOSAL, not a verdict; the triage prompt in step 2 is where the actual skip decision lands.
+The skill exists precisely because extracting a dozen URLs by hand is slow and error-prone. If you silently skip "obviously irrelevant" URLs without prompting the user, you are judging content you haven't seen — that's the user's role, not yours. The `reference` heuristic in step 1 is a PROPOSAL, not a verdict; the triage AskUserQuestion in step 2 is where the actual skip decision lands.
 
 ## Self-check before delivering the result
 
 Would this result pass review by a senior engineer? Concretely:
 
 - Were all URLs from the note processed — extracted, errored (with reason), or skipped via explicit user decision (triage)?
-- Were `reference`-classed URLs surfaced via numbered TUI prompt in step 2 — not silently dropped?
+- Were `reference`-classed URLs surfaced via AskUserQuestion in step 2 — not silently dropped?
 - Is the original note annotated correctly — original URL preserved, pointer appended only for extracted ones, triage-skipped URLs left bare?
 - Is the `extracted/<note-basename>/` layout consistent (slug naming, metadata.json per extract; one shared `extracted/` parent per directory)?
 - Is `.gitignore` updated idempotently — no duplicate lines?
-- Does the commit message reflect actual work — `extract: N URLs from <note>`?
+- Does the commit message reflect actual work — `extract-links: N URLs from <note>`?
 - Does the final report enumerate every URL with state (`extracted` / `error` / `skipped(reference)` / `skipped(user)`)?
 - No leaked secrets in `extracted/` (auth tokens from API responses, personal data)?
 - **(Light mode)** Every URL got either a one-line summary or an explicit `error`; thin/failed fetches are flagged honestly (not fabricated); no `extracted/` tree or `.gitignore` change was made?

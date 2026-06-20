@@ -304,11 +304,11 @@ Detect via keywords in `intake.interpreted_outcome`:
    > **before** advancing to the next — do not batch verification to the end.
 
    And a hand-off line:
-   > End-of-goal acceptance: hand the finished work to `/accept` for the tiered gate
+   > End-of-goal acceptance: hand the finished work to `/verify-done` for the tiered gate
    > (conformance + scenarios + quality).
 
    goal-prep only **writes** these as charter rules; the native `/goal` main model enforces
-   them at execution time. (Per-stage check is lightweight — one task's `Done when:`; `/accept`
+   them at execution time. (Per-stage check is lightweight — one task's `Done when:`; `/verify-done`
    is the heavy end gate. goal-prep is non-execution and runs neither.)
 
 User may edit `## Non-Negotiable Constraints` afterwards; the seed is just

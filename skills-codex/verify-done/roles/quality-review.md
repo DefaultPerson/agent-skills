@@ -1,6 +1,6 @@
 # Quality review — Tier 3 prompt for /accept (advisory)
 
-> Substance imported from Cursor's [team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) `thermo-nuclear-code-quality-review` (commit `3347cba`). The PR-review ceremony (review-tone phrasing, approve/block-PR "Approval Bar", reviewer persona) has been **stripped** — this runs as the advisory final tier of `/accept` and emits **structured findings**, not a PR verdict. Used by `workflows/accept.workflow.js`.
+> Substance imported from Cursor's [team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) `thermo-nuclear-code-quality-review` (commit `3347cba`). The PR-review ceremony (review-tone phrasing, approve/block-PR "Approval Bar", reviewer persona) has been **stripped** — this runs as the advisory final tier of `/verify-done` and emits **structured findings**, not a PR verdict. Used by `workflows/verify-done.workflow.js`.
 
 This file IS the prompt for the Tier 3 quality pass. It runs LAST, only on code that already **works behaviourally** (Tier 1 conformance passed + Tier 2 found no confirmed gap). It is **advisory by default** — its findings are reported, they do NOT flip the `/accept` verdict unless the run used `--block-on-quality` (and then only high-severity findings block).
 

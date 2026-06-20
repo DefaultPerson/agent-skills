@@ -6,7 +6,7 @@ In step 3, blueprint decomposes the spec into tasks. The format adapts to the sp
 
 ## Output: two files (tasks + reference)
 
-blueprint writes the plan as **two** files (step 6), for context economy — executors / per-stage sub-agents / `/accept` / goal-prep load only the lean tasks file:
+blueprint writes the plan as **two** files (step 6), for context economy — executors / per-stage sub-agents / `/verify-done` / goal-prep load only the lean tasks file:
 
 - **`<spec>.md` — tasks file (PRIMARY):** a `> Context: see <spec>.reference.md` pointer line, an optional `## Open questions` block (blocking `❓ NEEDS YOU` only), and `## Tasks`. Each task is **self-sufficient** — executable from this file alone (`Done when:` IS the acceptance). This is the downstream contract.
 - **`<spec>.reference.md` — reference:** `## Overview`, full `## Requirements`, Terminology, `## Assumptions & open questions`, `## Risks`, ADR links. Read-once "why".

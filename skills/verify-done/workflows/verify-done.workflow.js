@@ -1,5 +1,5 @@
 export const meta = {
-  name: 'accept-gate',
+  name: 'verify-done-gate',
   description: 'Plan-aware tiered acceptance gate: conformance + independent scenarios + advisory quality',
   phases: [
     { title: 'Tier1-Conformance', detail: 'run every Done-when proof + build/test/regression' },

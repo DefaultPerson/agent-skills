@@ -7,10 +7,10 @@
     {
       "name": "iron-skills",
       "source": "./",
-      "description": "Nine battle-tested skills for AI coding agents in Claude Code and Codex CLI.",
-      "version": "0.2.0",
+      "description": "Battle-tested skills for AI coding agents in Claude Code and Codex CLI.",
+      "version": "0.3.0",
       "category": "development",
-      "keywords": ["cleanup", "blueprint", "clarify", "spec", "extract", "notes", "youtube", "telegram", "diagnose", "debug", "deepen", "refactor", "architecture", "svgl", "svg", "logo", "icons", "babysit", "logs", "deploy", "monitor", "autonomous", "code-review", "code-quality", "maintainability", "audit", "goal-prep", "autoresearch", "goal", "accept", "acceptance", "gate"]
+      "keywords": ["cleanup", "blueprint", "spec", "extract-links", "notes", "youtube", "telegram", "svgl", "svg", "logo", "icons", "babysit", "logs", "deploy", "monitor", "autonomous", "code-quality", "maintainability", "goal-prep", "autoresearch", "goal", "verify-done", "acceptance", "gate"]
     }
   ]
 }

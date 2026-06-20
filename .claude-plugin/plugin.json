@@ -1,5 +1,5 @@
 {
   "name": "iron-skills",
-  "version": "0.2.0",
-  "description": "Nine battle-tested skills for AI coding agents in Claude Code and Codex CLI."
+  "version": "0.3.0",
+  "description": "Battle-tested skills for AI coding agents in Claude Code and Codex CLI."
 }

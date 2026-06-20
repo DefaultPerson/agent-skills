@@ -1,13 +1,13 @@
 ---
-name: accept
+name: verify-done
 description: >
   Plan-aware final ACCEPTANCE gate: given a /blueprint plan (or goal.md
   charter) + the built code, adversarially verify the result actually works
   against the ORIGINAL intent — re-run every `Done when:` proof (Tier 1),
   generate + run independent scenarios the plan may have missed (Tier 2),
   then an advisory maintainability pass (Tier 3). Read-only GATE, not a fixer —
-  emits DONE / NOT-DONE + a gap list. Triggers: "accept", "/accept",
-  "acceptance gate", "is this actually done", "приёмка".
+  emits DONE / NOT-DONE + a gap list. Triggers: "/verify-done", "verify done",
+  "accept", "acceptance gate", "is this actually done", "приёмка".
 when_to_use: >
   Execution of a plan/goal is finished (or at a milestone) and you want one
   honest verdict on whether the END RESULT is really done. NOT for a quick
@@ -15,12 +15,12 @@ when_to_use: >
 allowed-tools: [Bash, Glob, Grep, Read]
 ---
 
-# /accept (Codex variant)
+# /verify-done (Codex variant)
 
-The end gate of the loop: `cleanup → extract → blueprint → goal-prep → /goal → **/accept**`.
+The end gate of the loop: `cleanup → extract-links → blueprint → goal-prep → /goal → **/verify-done**`.
 Answers "does it actually work, including what the plan didn't think of?" — not "are the boxes ticked?".
 
-This is the **Codex CLI variant**. Behaviourally identical to the Claude variant — but Codex has **no `Workflow` tool**, so the three tiers run **sequentially in-session** (fan-out via `codex exec -` subprocesses where useful) instead of a parallel Workflow. Shared `roles/quality-review.md` comes from the Claude tree via install-time symlink.
+This is the **Codex CLI variant**. Behaviourally identical to the Claude variant — but Codex has **no `Workflow` tool**, so the three tiers run **sequentially in-session** (fan-out via `codex exec -` subprocesses where useful) instead of a parallel Workflow. Shared `roles/quality-review.md` is carried with the Codex skill (copied from the Claude tree by `ci/build-codex.sh` for native packaging; symlinked by `install-codex.sh` otherwise).
 
 > **Letter = spirit.** The goal is an *honest* verdict — never a false DONE, never a FAIL for something that just couldn't be verified.
 > **Gate, not fixer.** No `Edit`/`Write`: verify and report; fixing goes back to `/goal` or `/simplify`.
@@ -28,7 +28,7 @@ This is the **Codex CLI variant**. Behaviourally identical to the Claude variant
 ## Usage
 
 ```
-/accept [<plan-or-spec path>] [--deep] [--block-on-quality]
+/verify-done [<plan-or-spec path>] [--deep] [--block-on-quality]
 ```
 
 - No path → locate the most recent `/blueprint` tasks file (`<spec>.md`) or `goal.md`; ask via a numbered TUI prompt if ambiguous.
@@ -70,9 +70,9 @@ VERDICT: DONE | NOT-DONE — <reason>
 
 ## Connections
 
-- **Input:** a `/blueprint` plan (`<spec>.md` + `<spec>.reference.md`) or a `goal-prep` charter (which writes "hand finished work to `/accept`").
-- **Per-stage vs end:** lightweight per-stage `Done when:` lives in execution (seeded by goal-prep); `/accept` is the holistic END gate — don't run it per stage.
-- **NOT** `/verify` / `/code-review` / `/blueprint` Phase 7.6 (which reviews the *plan*; `/accept` reviews the *result*).
+- **Input:** a `/blueprint` plan (`<spec>.md` + `<spec>.reference.md`) or a `goal-prep` charter (which writes "hand finished work to `/verify-done`").
+- **Per-stage vs end:** lightweight per-stage `Done when:` lives in execution (seeded by goal-prep); `/verify-done` is the holistic END gate — don't run it per stage.
+- **NOT** `/verify` / `/code-review` / `/blueprint` Phase 7.6 (which reviews the *plan*; `/verify-done` reviews the *result*).
 
 ## Self-check before reporting
 

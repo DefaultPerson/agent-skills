@@ -237,8 +237,8 @@ $(cat "$SPEC_PATH")"
    If any signal is found, surface a numbered TUI prompt per item with `Keep deferred (current)` / `Include in v1` / `Drop entirely` / `Drop and document in .out-of-scope/`. Apply decisions. For `Drop and document`, write `.out-of-scope/<concept>.md` per `references/out-of-scope-format.md`. Loop back to step 3/4 if scope changes require re-decomposition. NEVER write to disk while scope cuts are unconfirmed. Nothing found → gate silently passes.
 
    Phase 1 also reads existing `.out-of-scope/*.md`; an input concept matching a prior rejection is surfaced in step 2 (confirm rejection stands, or reconsider — which deletes the matching file).
-6. **Write the plan as TWO files** (context economy — executors/`/accept`/goal-prep load only the lean tasks file). Back up the original (`<spec>.bak`), then write:
-   - **`<spec>.md` — tasks file (PRIMARY):** a `> Context: see <spec>.reference.md` pointer; a `## Open questions` block IF blocking `❓ NEEDS YOU` remain; `## Tasks` (each self-sufficient: title, `**Files**`, `Done when:` proof, inline `Edge:`). Downstream contract — `/goal`, `/accept`, goal-prep read THIS.
+6. **Write the plan as TWO files** (context economy — executors/`/verify-done`/goal-prep load only the lean tasks file). Back up the original (`<spec>.bak`), then write:
+   - **`<spec>.md` — tasks file (PRIMARY):** a `> Context: see <spec>.reference.md` pointer; a `## Open questions` block IF blocking `❓ NEEDS YOU` remain; `## Tasks` (each self-sufficient: title, `**Files**`, `Done when:` proof, inline `Edge:`). Downstream contract — `/goal`, `/verify-done`, goal-prep read THIS.
    - **`<spec>.reference.md` — reference:** `## Overview`, full `## Requirements` (`[must]/[nice]/[later]`), Terminology, `## Assumptions & open questions` (ranked), `## Risks`, ADR links.
    - **Self-sufficiency rule:** a task is executable from the tasks file alone (`Done when:` IS the acceptance); reference is only "why". Threshold: a trivial spec may stay one file. Template: `references/task-format.md`.
 7. **Mechanical validation.** `python3 scripts/verify-spec.py <spec>`. FAIL → fix and re-run. (Style warnings about old ceremony are non-blocking.)
@@ -350,7 +350,7 @@ Phase 7.6 internals (per-round findings, applied/rejected/escalated, per-reviewe
 
 ## Connections to other skills
 
-- **Input:** typically after `/cleanup` (sectioned markdown without `[MISSING]`). A manually written spec is fine if structurally valid. Optionally preceded by `/extract`.
+- **Input:** typically after `/cleanup` (sectioned markdown without `[MISSING]`). A manually written spec is fine if structurally valid. Optionally preceded by `/extract-links`.
 - **Upstream (project-level, orthogonal):** `mattpocock:grill-with-docs` owns `CONTEXT.md` (glossary) and general ADR creation. `/blueprint` reads existing `docs/adr/*.md` to respect prior decisions but does NOT touch `CONTEXT.md`.
 - **Output (on disk):** the plan replaces the original; `.bak` kept until step 10; new ADRs (if approved) land in `docs/adr/`.
 - **Output (optional, in tracker):** Step 10 offers a literal "type `/to-prd` next" if `mattpocock:to-prd` is installed at `~/.codex/skills/to-prd/`.
