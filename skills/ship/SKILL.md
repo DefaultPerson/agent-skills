@@ -25,6 +25,11 @@ One prompt in, verified result out. `/ship` reads your task, **picks where to
 start and which skills to chain**, runs them at the autonomy level you choose, and
 finishes with `/verify-done` so "done" means *actually* done — not "looks done".
 
+> **⚠️ Experimental.** This is the newest skill and is **not yet battle-tested** —
+> the rest of iron-skills is proven in daily use; `/ship` is not yet. Prefer
+> `guided` or `checkpoint` autonomy, and review what it decides before trusting it
+> unattended on anything that matters.
+
 > **Claude Code only.** It drives the native `/goal` loop, invokes other skills via
 > the Skill tool, and runs the `/verify-done` Workflow — Codex's orchestration
 > primitives differ, so there's no Codex variant.
