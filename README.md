@@ -22,15 +22,15 @@ The steps chain, but each works on its own — run one or the whole line. `verif
 
 ## Skills
 
-- **`/cleanup`** — reorganize a messy notes/chat dump into clean sectioned markdown, losslessly. Three-level gap detection proves nothing was dropped.
-- **`/extract-links`** — annotate every URL in a note with its content. **Default light:** a one-line gist inline next to each URL. `--full` pulls full content (YouTube subtitles, Telegram posts, articles) into a local `extracted/` tree.
-- **`/blueprint`** — turn a spec into a readable plan of atomic tasks, each with a `Done when:` shell proof. Plain-language requirements, ranked assumptions, optional ADRs, and an optional cross-model review (Codex + Claude, plus an OpenRouter third reviewer).
-- **`/goal-prep`** — compile a charter for Claude Code's native `/goal`: completion criteria, anti-patterns, and a ready-to-paste `/goal` command. Writes the charter; never executes.
-- **`/autoresearch`** — autonomous keep-or-revert loop: optimize a metric with single atomic changes, committing before verifying and reverting failures. Per-iteration work runs in a bounded sub-agent so context stays flat.
-- **`/verify-done`** — final acceptance gate (was `/accept`): re-runs every `Done when:` proof, generates independent scenarios the plan missed, then an advisory quality pass. Read-only — returns `DONE`/`NOT-DONE` + a gap list; heavy work runs in a Workflow's sub-agents.
-- **`/svgl`** — fetch SVG brand/tech logos from [svgl.app](https://svgl.app) into your project, by name or category.
+- **`/cleanup`** — tidy a messy notes or chat dump into a clean, well-structured doc, without dropping anything. *e.g. a long brain-dump → an organized file with clear headings, every link and detail kept.*
+- **`/extract-links`** — bring what's behind the links in a note into the note itself, so you don't open each one. Adds a one-line summary next to every link by default; `--full` saves the full text (YouTube transcripts, Telegram posts, articles) locally. *e.g. `/extract-links notes.md` → each URL gets a "what this is" note inline.*
+- **`/blueprint`** — turn a rough spec into a clear step-by-step plan: small tasks, each with a one-line "done when this command passes" check. *e.g. `/blueprint feature.md` → a task list you or an agent can build and verify.*
+- **`/goal-prep`** — write the brief for Claude Code's built-in `/goal` so an autonomous run knows exactly when it's finished. It only prepares the brief — it doesn't run anything. *e.g. hand it a plan → get a ready-to-paste `/goal` command with clear "done" criteria.*
+- **`/autoresearch`** — improve a number on its own: try one change at a time, keep it if the metric got better, revert if not — looping until it stops improving. *e.g. "make this benchmark faster" → it experiments commit by commit, unattended.*
+- **`/verify-done`** — check whether work is *actually* finished, not just "looks done": re-runs the plan's checks, tries cases the plan may have missed, and flags quality issues. Read-only — answers DONE / NOT-DONE with a list of gaps. *e.g. after building a feature → it tells you what still doesn't work.*
+- **`/svgl`** — grab brand/tech logos as SVGs straight into your project. *e.g. `/svgl github stripe` → the logos saved as `.svg` files.*
 
-Plus **`/babysit`** (Claude Code only) — autonomous watch · fix · deploy · re-check loop for a running service; escalates with sound + desktop notification only when genuinely stuck.
+Plus **`/babysit`** (Claude Code only) — watch a running service and keep it alive unattended: every few minutes it checks logs and health, and on trouble it fixes, deploys, and re-checks — beeping for you only when it's truly stuck. *e.g. point it at your prod app → it self-heals and pings you only on a real fire.*
 
 ## Install
 
