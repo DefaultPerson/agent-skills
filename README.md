@@ -6,11 +6,19 @@ Battle-tested skills for AI coding agents — Claude Code and Codex CLI. Only th
 
 ## Flow
 
+Full — messy input to shipped + verified:
+
 ```
 cleanup → extract-links → blueprint → goal-prep → /goal → verify-done
 ```
 
-The steps chain, but each works on its own — run one or the whole line.
+Small task — skip the heavy prep:
+
+```
+native plan mode → implement → verify-done
+```
+
+The steps chain, but each works on its own — run one or the whole line. `verify-done` takes a `/blueprint` plan, a `goal.md`, or just a plan-mode/inline plan.
 
 ## Skills
 

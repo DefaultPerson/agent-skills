@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 — 2026-06-20
+
+`/verify-done` is now plan-source-agnostic: besides a `/blueprint` plan or `goal.md`,
+it accepts a plain native plan-mode / inline plan — the plan prose becomes the intent,
+and proofs are derived (or fall back to build/test, else the verdict leans on Tier 2).
+Enables a lightweight small-task flow — `native plan mode → implement → verify-done` —
+added to the README beside the full flow.
+
 ## 0.4.0 — 2026-06-20
 
 `/babysit` moved from a command to a **Claude-only skill** — Claude can now invoke

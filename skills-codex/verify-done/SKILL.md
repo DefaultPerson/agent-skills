@@ -1,9 +1,10 @@
 ---
 name: verify-done
 description: >
-  Plan-aware final ACCEPTANCE gate: given a /blueprint plan (or goal.md
-  charter) + the built code, adversarially verify the result actually works
-  against the ORIGINAL intent — re-run every `Done when:` proof (Tier 1),
+  Plan-aware final ACCEPTANCE gate: given any plan (a /blueprint plan, a
+  goal.md charter, OR a plain plan-mode / inline plan) + the built code,
+  adversarially verify the result actually works against the ORIGINAL
+  intent — re-run every `Done when:` proof (Tier 1),
   generate + run independent scenarios the plan may have missed (Tier 2),
   then an advisory maintainability pass (Tier 3). Read-only GATE, not a fixer —
   emits DONE / NOT-DONE + a gap list. Triggers: "/verify-done", "verify done",
@@ -31,7 +32,7 @@ This is the **Codex CLI variant**. Behaviourally identical to the Claude variant
 /verify-done [<plan-or-spec path>] [--deep] [--block-on-quality]
 ```
 
-- No path → locate the most recent `/blueprint` tasks file (`<spec>.md`) or `goal.md`; ask via a numbered TUI prompt if ambiguous.
+- No path → locate the most recent `/blueprint` tasks file (`<spec>.md`) or `goal.md`; **or** use a plain plan-mode / inline plan / "the diff + what it was meant to do" from the conversation. Ask via a numbered TUI prompt only if intent is genuinely unclear.
 - `--deep` → Tier 2 across all requirements + adversarial inputs (default **light**).
 - `--block-on-quality` → high-severity Tier 3 findings flip to NOT-DONE (default: Tier 3 **advisory**).
 
@@ -39,13 +40,14 @@ This is the **Codex CLI variant**. Behaviourally identical to the Claude variant
 
 - Needs a **runnable env** — unrunnable proofs/scenarios come back **UNKNOWN** → NOT-DONE "could not verify" (honest, not a defect of the change).
 - Only as good as the original intent handed to Tier 2.
+- **Unstructured plan = softer verdict** — with no `Done when:` proofs (a plan-mode/inline plan) verification is scenario-driven, not proof-driven. Fine for small tasks; for critical work write proofs via `/blueprint`.
 - Not a bug hunter (use `/code-review`), not a single-change check (use `/verify`), not maintainability auto-fix (use `/simplify`).
 
 ## What it does
 
-1. **Resolve inputs:** the `/blueprint` tasks file `<spec>.md` (or `goal.md`) → parse `Done when:` lines into proofs; the ORIGINAL intent = sibling `<spec>.reference.md` or pre-blueprint notes (NOT the task list; ask via numbered TUI if unclear); a sandbox (throwaway `git worktree` if possible, else temp dir, else `none`); knobs `--deep`/`--block-on-quality`; read `roles/quality-review.md`.
+1. **Resolve inputs** (**plan-source-agnostic**): EITHER a `/blueprint` tasks file `<spec>.md` (or `goal.md`) → parse `Done when:` lines into proofs, intent = sibling `<spec>.reference.md`; OR an unstructured plan (plan-mode/inline/just-the-diff) → there are no `Done when:` lines, so **derive** a few concrete shell proofs from what the plan promises and use the plan prose itself as the intent (pass it into any `codex exec -` subprocess explicitly — subprocesses don't see your session). Always grab `build/test/regression` from the repo. Plus: a sandbox (throwaway `git worktree` if possible, else temp dir, else `none`); knobs `--deep`/`--block-on-quality`; read `roles/quality-review.md`.
 2. **Run the three tiers sequentially:**
-   - **Tier 1 — Conformance:** run each `Done when:` proof + build/test/regression in the sandbox → `PASS|FAIL|UNKNOWN` per check.
+   - **Tier 1 — Conformance:** run each `Done when:` proof (explicit or derived) + build/test/regression in the sandbox → `PASS|FAIL|UNKNOWN` per check. With an unstructured plan and nothing derivable, Tier 1 falls back to build/test only; if those are absent too it's empty → verdict leans on Tier 2 (report it).
    - **Tier 2 — Independent scenarios:** from the ORIGINAL intent, generate risk-ranked user-case/edge/adversarial scenarios (light by default; `--deep` widens). Each scenario must be **grounded** in a quote from the intent (drop+count ungrounded). Run the runnable ones in the sandbox; the rest are honest UNKNOWN. Use `codex exec -` subprocesses to parallelize generation/runs if helpful.
    - **Tier 3 — Quality (advisory):** runs LAST and only if behaviour works; feed the prompt body of `roles/quality-review.md` (only the text BETWEEN its `BEGIN_PROMPT`/`END_PROMPT` sentinels — skip the provenance header) to `codex exec -` (or inline) → structured maintainability findings. Advisory unless `--block-on-quality`.
 3. **Report** the short verdict + three honest buckets. Hand findings back to `/goal` or `/simplify`; fix nothing.

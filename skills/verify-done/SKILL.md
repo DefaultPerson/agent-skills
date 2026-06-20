@@ -1,9 +1,10 @@
 ---
 name: verify-done
 description: >
-  Plan-aware final ACCEPTANCE gate: given a /blueprint plan (or goal.md
-  charter) + the built code, adversarially verify the result actually
-  works against the ORIGINAL intent — re-run every `Done when:` proof
+  Plan-aware final ACCEPTANCE gate: given any plan (a /blueprint plan, a
+  goal.md charter, OR a plain native plan-mode / inline plan) + the built
+  code, adversarially verify the result actually works against the ORIGINAL
+  intent — re-run every `Done when:` proof
   (Tier 1), generate + run independent user-scenarios the plan may have
   missed (Tier 2), then an advisory maintainability pass (Tier 3). Read-only
   GATE, not a fixer — emits DONE / NOT-DONE + a gap list. Heavy verification
@@ -37,22 +38,24 @@ It answers "does it actually work, including what the plan didn't think of?" —
 /verify-done [<plan-or-spec path>] [--deep] [--block-on-quality]
 ```
 
-- No path → locate the most recent `/blueprint` tasks file (`<spec>.md`) or `goal.md` charter; ask via `AskUserQuestion` if ambiguous.
+- No path → locate the most recent `/blueprint` tasks file (`<spec>.md`) or `goal.md` charter; **or** use an approved native plan-mode plan / an inline plan / "the diff + what it was meant to do" straight from the conversation. Ask via `AskUserQuestion` only if the intent is genuinely unclear.
 - `--deep` → Tier 2 generates scenarios across all requirements + adversarial inputs (default is **light**: top high/med-risk only).
 - `--block-on-quality` → high-severity Tier 3 findings flip the verdict to NOT-DONE (default: Tier 3 is **advisory**, never blocks).
 
 ## Weaknesses and when NOT to use
 
 - **Needs a runnable environment.** If the `Done when:` proofs / scenarios can't run (no server, missing deps), they come back **UNKNOWN** → verdict NOT-DONE "could not verify". That's honest, not a failure of the change — but it means `/verify-done` can't bless work it can't exercise.
-- **Only as good as the original intent it's handed.** Tier 2 grounds scenarios in the ORIGINAL intent (the reference file / pre-blueprint notes). Garbage intent → shallow scenarios.
+- **Only as good as the original intent it's handed.** Tier 2 grounds scenarios in the ORIGINAL intent (the reference file / plan / notes). Garbage intent → shallow scenarios.
+- **Unstructured plan = softer verdict.** With no `Done when:` proofs (a plan-mode/inline plan), verification is **scenario-driven** rather than proof-driven — great for small tasks, weaker for critical ones. For high-stakes work, write proofs (`/blueprint`).
 - **Not a bug hunter or a linter.** Correctness bugs → `/code-review`; per-change behaviour → `/verify`; maintainability auto-fixes → `/simplify`. `/verify-done` is whole-plan *acceptance*.
 - **Workflow tool may be unavailable** (plan-gated). Then it falls back to a sequential prose `Agent` fan-out — same verdict shape, just slower.
 
 ## What it does
 
-1. **Resolve inputs** (this is the thin part — keep it cheap):
-   - **Plan / tasks:** the `/blueprint` tasks file `<spec>.md` (primary) or a `goal.md` charter. Parse its `Done when:` lines into `doneWhenProofs = [{id, title, cmd}]`. Grab `buildCmd`/`testCmd`/`regressionCmd` from the repo if obvious (else null).
-   - **Original intent:** the sibling `<spec>.reference.md` (blueprint Part D) or the pre-blueprint notes — NOT the task list. If you can't tell which file holds the real intent, ask once via `AskUserQuestion`.
+1. **Resolve inputs** (thin part — keep it cheap). `/verify-done` is **plan-source-agnostic** — use whichever you have:
+   - **Structured (best, proof-driven):** a `/blueprint` tasks file `<spec>.md` → parse `Done when:` lines into `doneWhenProofs = [{id, title, cmd}]`; intent = sibling `<spec>.reference.md`. Or a `goal.md` charter (proofs from its audit table, intent from its stated outcome).
+   - **Unstructured (plan-mode / inline / just-the-diff, scenario-driven):** an approved native plan-mode plan, an inline description, or "here's the change + what it was supposed to do." No `Done when:` lines exist, so: (a) **derive** a few concrete shell proofs from what the plan promises (an endpoint/CLI/behaviour it claims → a command that exercises it) into `doneWhenProofs`; (b) the plan prose **is** the intent → pass it verbatim as `intentNotes`. ⚠️ A plan-mode plan lives only in the conversation — the Workflow's sub-agents can't see it, so YOU read it from context and pass it in `intentNotes` (and any derived proofs).
+   - **Always:** grab `buildCmd`/`testCmd`/`regressionCmd` from the repo if obvious (else null). If nothing identifies the real intent, ask once via `AskUserQuestion`.
    - **Sandbox:** prefer a throwaway git worktree (`ToolSearch` for `EnterWorktree`; use it if present), else a temp dir, else `none`. Scenarios/proofs run there so the repo isn't mutated.
    - **Knobs:** `--deep`, `--block-on-quality`. **Load** the text BETWEEN the `BEGIN_PROMPT` and `END_PROMPT` sentinels in `roles/quality-review.md` into `qualityPrompt` (skip the provenance header above `BEGIN_PROMPT` and the sentinel lines themselves — they're meta, not instructions).
 2. **Run the gate** — invoke the workflow (heavy work stays in its sub-agents; only the verdict returns):
@@ -66,7 +69,7 @@ It answers "does it actually work, including what the plan didn't think of?" —
 
 ## The three tiers (in the workflow)
 
-- **Tier 1 — Conformance:** re-run every `Done when:` proof + build/test/regression in the sandbox → `PASS|FAIL|UNKNOWN`.
+- **Tier 1 — Conformance:** re-run every `Done when:` proof (explicit or derived) + build/test/regression in the sandbox → `PASS|FAIL|UNKNOWN`. With an unstructured plan and nothing derivable, Tier 1 falls back to build/test only; if those don't exist either it's empty → the verdict leans on Tier 2 (report it — softer than proof-driven).
 - **Tier 2 — Independent scenarios:** one agent reads the **original intent** and generates risk-ranked user-case/edge/adversarial scenarios (light by default, `--deep` widens); the runnable ones execute in the sandbox. Catches what the plan's own proofs didn't.
 - **Tier 3 — Quality (advisory):** runs LAST and only if behaviour works; `roles/quality-review.md` (thermo substance) emits structured maintainability findings. Advisory unless `--block-on-quality`.
 
@@ -90,7 +93,7 @@ VERDICT: DONE | NOT-DONE  — <reason>
 
 ## Connections
 
-- **Input:** a `/blueprint` plan (`<spec>.md` tasks + `<spec>.reference.md` intent) or a `goal-prep` `goal.md` charter. `goal-prep` writes "hand finished work to `/verify-done`" into the charter; this is that hand-off.
+- **Input:** a `/blueprint` plan (`<spec>.md` tasks + `<spec>.reference.md` intent), a `goal-prep` `goal.md` charter, or — for **small tasks** — a native plan-mode / inline plan straight from the conversation (`native plan mode → implement → /verify-done`). `goal-prep` writes "hand finished work to `/verify-done`" into the charter; this is that hand-off.
 - **Per-stage vs end:** the lightweight per-stage `Done when:` check lives in the execution loop (seeded by goal-prep); `/verify-done` is the heavy, holistic END gate. Don't run the full gate per stage.
 - **Downstream of a NOT-DONE:** confirmed failures → back to `/goal` or manual; quality findings → `/simplify`.
 - **Not** `/verify` (single change), **not** `/code-review` (diff bugs), **not** `/blueprint` Phase 7.6 (reviews the *plan* before build; `/verify-done` reviews the *result* after).
