@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 — 2026-06-20
+
+New `/ship` skill — an autonomous end-to-end orchestrator. Hand it one freeform task
+and it picks the entry point, chains the right skills, runs via `/goal`, and finishes
+with `/verify-done`. Autonomy is chosen interactively (guided / autopilot / checkpoint);
+hard guardrails (nothing irreversible/unsafe unattended, `/verify-done` non-skippable,
+every auto-decision logged) apply in every mode. Claude-only (orchestrates `/goal` +
+the Skill tool + the verify-done Workflow).
+
 ## 0.5.0 — 2026-06-20
 
 `/verify-done` is now plan-source-agnostic: besides a `/blueprint` plan or `goal.md`,

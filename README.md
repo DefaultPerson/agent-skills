@@ -20,8 +20,17 @@ native plan mode → implement → verify-done
 
 The steps chain, but each works on its own — run one or the whole line. `verify-done` takes a `/blueprint` plan, a `goal.md`, or just a plan-mode/inline plan.
 
+Or hand the whole thing off:
+
+```
+/ship «your task»  →  it picks the chain and runs to a verified finish
+```
+
+`/ship` asks once how autonomous to be (guided / autopilot / checkpoint), then routes and runs end-to-end. Claude Code only.
+
 ## Skills
 
+- **`/ship`** *(the autopilot)* — hand it a whole task and it picks which of the skills below to run, chains them, and drives to a verified finish; asks once how hands-off to be. Claude Code only. *e.g. `/ship «add dark mode and make sure it works»` → it plans, builds, and verifies, mostly unattended.*
 - **`/cleanup`** — tidy a messy notes or chat dump into a clean, well-structured doc, without dropping anything. *e.g. a long brain-dump → an organized file with clear headings, every link and detail kept.*
 - **`/extract-links`** — bring what's behind the links in a note into the note itself, so you don't open each one. Adds a one-line summary next to every link by default; `--full` saves the full text (YouTube transcripts, Telegram posts, articles) locally. *e.g. `/extract-links notes.md` → each URL gets a "what this is" note inline.*
 - **`/blueprint`** — turn a rough spec into a clear step-by-step plan: small tasks, each with a one-line "done when this command passes" check. *e.g. `/blueprint feature.md` → a task list you or an agent can build and verify.*
