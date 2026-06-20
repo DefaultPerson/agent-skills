@@ -14,7 +14,7 @@ export const meta = {
 //                                          from an unstructured plan — may be [] (then Tier 1
 //                                          falls back to build/test, else verdict leans on Tier 2)
 //   buildCmd, testCmd, regressionCmd, coverageCmd : string|null
-//   intentNotes    : ORIGINAL intent text (<spec>.reference.md, goal.md, or a plan-mode/inline plan) — Tier-2 grounding
+//   intentNotes    : ORIGINAL intent text (reference.md, goal.md, or a plan-mode/inline plan) — Tier-2 grounding
 //   deep           : bool  (--deep; default false = light)
 //   blockOnQuality : bool  (--block-on-quality; default false = advisory)
 //   qualityPrompt  : full text of roles/quality-review.md

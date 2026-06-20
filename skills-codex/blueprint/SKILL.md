@@ -138,7 +138,7 @@ The proof describes what the system DOES (observable through its interface), not
 
 ### Surface assumptions & open questions
 
-Put an **`## Assumptions & open questions`** section in the **reference file** (`<spec>.reference.md`); surface any *blocking* `❓ NEEDS YOU` items also in the tasks file's `## Open questions` so they can't be missed before execution (borrowed from fusion). List each assumption with a confidence (high/medium/low) + what it's based on; mark genuine human-decision points with `❓ NEEDS YOU:`.
+Put an **`## Assumptions & open questions`** section in the **reference file** (`reference.md`); surface any *blocking* `❓ NEEDS YOU` items also in the tasks file's `## Open questions` so they can't be missed before execution (borrowed from fusion). List each assumption with a confidence (high/medium/low) + what it's based on; mark genuine human-decision points with `❓ NEEDS YOU:`.
 
 ```markdown
 ## Assumptions & open questions
@@ -210,37 +210,24 @@ $(cat "$SPEC_PATH")"
 
 ## What the skill does (step by step)
 
-1. **Read and analyze the spec.** Validate (markdown, `## ` headers, no `[MISSING]` markers), classify type (product / technical / small), scan the codebase if present, flag `[NEEDS CLARIFICATION]` items. Sweep `docs/adr/*.md` if present into an in-memory "established decisions" list for Phase 5. Skip silently if absent.
+1. **Read and analyze the spec.** Validate (markdown, `## ` headers, no `[MISSING]` markers), classify type (product / technical / small), scan the codebase if present, flag `[NEEDS CLARIFICATION]` items.
 2. **Challenge + ask** (hard gate). Run the multi-angle challenge (don't-build / simpler / future-dependent / scenarios). Then ask what's unclear — max 5 questions via numbered TUI prompts (`roles/questioner.md`'s `AskUserQuestion` semantic → numbered TUI list). If already clear and the framing is sound — skip.
 3. **Decompose into atomic tasks.** Format adapts to type — `references/task-format.md`. Each task touches 1-3 files (a vertical slice) and has a `Done when:` line with a runnable shell proof. No `[P]`, Stages, `AC-N.N`, or `Given/When/Then`.
 4. **Pin requirements & contracts.** Plain sentences tagged `[must]`/`[nice]`/`[later]` (light `R1`/`R2` ids only if needed). Skip if small/single-component. Details: `references/contracts.md`.
-5. **Self-review checklist.** Placeholder scan, internal consistency, ambiguity check, **ADR candidate detection**, and a **hard-gate Scope-cut audit (user-facing)**.
+5. **Self-review checklist.** Placeholder scan, internal consistency, ambiguity check, and a **hard-gate Scope-cut audit (user-facing)**.
 
-   **ADR candidate detection** (before the Scope-cut audit). Scan the in-memory plan for decisions passing ALL THREE criteria from `references/adr-format.md`:
+   **Hard-to-reverse decisions** (no ceremony). If a task locks in a choice that's costly to undo with a real trade-off (DB schema, public API contract, auth/infra/messaging choice, security boundary, major dependency lock-in), record it in **one line** in the reference file's `## Risks` — what was chosen + the trade-off. Genuine forks you shouldn't pick alone already go to `## Assumptions & open questions` as `❓ NEEDS YOU`. **No `docs/adr/` files, no numbering, no template.**
 
-   1. **Hard to reverse** — DB schema, public API contract, infra/auth/messaging choice, security boundary, major dependency lock-in.
-   2. **Surprising without context** — a future reader will wonder "why this way?"
-   3. **Real trade-off** — an explicit alternative was considered and rejected.
-
-   Build a candidate list (max 5). Pass only if all three hold. Surface the 3 highest-reverse-cost passes via numbered TUI prompts:
-   - **Create ADR-NNNN: `<short title>`** — minimal ADR per `references/adr-format.md` at `docs/adr/NNNN-slug.md` (NNNN = max existing + 1, four-digit). Create `docs/adr/` lazily.
-   - **Already documented (specify ADR-MMMM)** — if the plan contradicts it, surface as a conflict prompt (Keep / Revise to match ADR / Supersede ADR / Discuss).
-   - **Skip** — ignore.
-
-   Additionally, scan the plan against the Phase 1 ADR sweep list; any requirement/task contradicting an established ADR → conflict prompt regardless of the filter.
-
-   Then the **Scope-cut audit (user-facing)** scans for deferral signals:
+   The **Scope-cut audit (user-facing)** scans for deferral signals:
    - Requirements tagged `[later]`, or `[must]`/`[nice]` carrying `(v2)`, `(future)`, `(deferred)`, `(later)`, `(stretch goal)`, `(MVP only)`, `(out of scope for now)`, `(not for now)`.
    - `Non-goals` items mapping back to input.
    - Input features/endpoints/edge cases with no backing task or silently dropped.
 
-   If any signal is found, surface a numbered TUI prompt per item with `Keep deferred (current)` / `Include in v1` / `Drop entirely` / `Drop and document in .out-of-scope/`. Apply decisions. For `Drop and document`, write `.out-of-scope/<concept>.md` per `references/out-of-scope-format.md`. Loop back to step 3/4 if scope changes require re-decomposition. NEVER write to disk while scope cuts are unconfirmed. Nothing found → gate silently passes.
-
-   Phase 1 also reads existing `.out-of-scope/*.md`; an input concept matching a prior rejection is surfaced in step 2 (confirm rejection stands, or reconsider — which deletes the matching file).
-6. **Write the plan as TWO files** (context economy — executors/`/verify-done`/goal-prep load only the lean tasks file). Back up the original (`<spec>.bak`), then write:
-   - **`<spec>.md` — tasks file (PRIMARY):** a `> Context: see <spec>.reference.md` pointer; a `## Open questions` block IF blocking `❓ NEEDS YOU` remain; `## Tasks` (each self-sufficient: title, `**Files**`, `Done when:` proof, inline `Edge:`). Downstream contract — `/goal`, `/verify-done`, goal-prep read THIS.
-   - **`<spec>.reference.md` — reference:** `## Overview`, full `## Requirements` (`[must]/[nice]/[later]`), Terminology, `## Assumptions & open questions` (ranked), `## Risks`, ADR links.
-   - **Self-sufficiency rule:** a task is executable from the tasks file alone (`Done when:` IS the acceptance); reference is only "why". Threshold: a trivial spec may stay one file. Template: `references/task-format.md`.
+   If any signal is found, surface a numbered TUI prompt per item with `Keep deferred (current)` / `Include in v1` / `Drop entirely` / `Drop (record in the plan)`. Apply decisions. For `Drop (record in the plan)`, note it in one line under the reference file's `## Non-goals` (what + why) — no separate files. Loop back to step 3/4 if scope changes require re-decomposition. NEVER write to disk while scope cuts are unconfirmed. Nothing found → gate silently passes.
+6. **Write the plan.** Back up the original (`<spec>.bak`). Normally **two files** (context economy — executors/`/verify-done`/goal-prep load only the lean tasks file). **When the plan is more than one file, put them in a flat directory `<spec-stem>/`** (e.g. `auth-spec.md` → `auth-spec/`) — **no nested subdirs**; a trivial spec that fits one file stays as `<spec>.md`.
+   - **`<spec-stem>/tasks.md` — tasks file (PRIMARY):** a `> Context: see reference.md` pointer; a `## Open questions` block IF blocking `❓ NEEDS YOU` remain; `## Tasks` (each self-sufficient: title, `**Files**`, `Done when:` proof, inline `Edge:`). Downstream contract — `/goal`, `/verify-done`, goal-prep read THIS. (Single-file fallback: `<spec>.md`.)
+   - **`<spec-stem>/reference.md` — reference:** `## Overview`, full `## Requirements` (`[must]/[nice]/[later]`), Terminology, `## Assumptions & open questions` (ranked), `## Risks` (hard-to-reverse decisions here), `## Non-goals`.
+   - **Self-sufficiency rule:** a task is executable from the tasks file alone (`Done when:` IS the acceptance); reference is only "why". Downstream readers resolve `<spec-stem>/tasks.md` or `<spec>.md`. Template: `references/task-format.md`.
 7. **Mechanical validation.** `python3 scripts/verify-spec.py <spec>`. FAIL → fix and re-run. (Style warnings about old ceremony are non-blocking.)
 8. **Cross-model consensus loop (Phase 7.6).** External reviewer(s) find, Codex self-assesses, iterate until CONSENSUS or max rounds. Next section. Skippable with `--consensus-rounds 0`.
 9. **Approval gate.** Summary report + numbered TUI prompt (Approve / Modify / Questions). After approval → step 10.
@@ -340,8 +327,8 @@ Output schema (defined identically by `roles/codex-reviewer.md` and `roles/openr
 
 ## Outputs
 
-- `<spec>.md` — **tasks file** (primary): overwrites the original path; lean executable/trackable artifact. Downstream reads this.
-- `<spec>.reference.md` — **reference**: overview/requirements/assumptions/risks (omitted for a trivial single-file spec).
+- `<spec-stem>/tasks.md` — **tasks file** (primary): lean executable/trackable artifact. Downstream reads this. (Trivial single-file spec → `<spec>.md`.)
+- `<spec-stem>/reference.md` — **reference**: overview/requirements/assumptions/risks/non-goals (omitted for a trivial single-file spec).
 - `<spec>.bak` — original before enrichment. Offered for deletion at step 10.
 
 Git: `pre-blueprint: <name>` (snapshot before) and `blueprint: enrich <name>` (after step 6).
@@ -351,8 +338,8 @@ Phase 7.6 internals (per-round findings, applied/rejected/escalated, per-reviewe
 ## Connections to other skills
 
 - **Input:** typically after `/cleanup` (sectioned markdown without `[MISSING]`). A manually written spec is fine if structurally valid. Optionally preceded by `/extract-links`.
-- **Upstream (project-level, orthogonal):** `mattpocock:grill-with-docs` owns `CONTEXT.md` (glossary) and general ADR creation. `/blueprint` reads existing `docs/adr/*.md` to respect prior decisions but does NOT touch `CONTEXT.md`.
-- **Output (on disk):** the plan replaces the original; `.bak` kept until step 10; new ADRs (if approved) land in `docs/adr/`.
+- **Upstream (project-level, orthogonal):** `mattpocock:grill-with-docs` owns `CONTEXT.md` (glossary). `/blueprint` does NOT touch `CONTEXT.md`; hard-to-reverse decisions are noted inline in `## Risks`, not in a `docs/adr/` tree.
+- **Output (on disk):** the plan directory `<spec-stem>/` (`tasks.md` + `reference.md`), or `<spec>.md` for a trivial spec; original backed up to `<spec>.bak`, kept until step 10.
 - **Output (optional, in tracker):** Step 10 offers a literal "type `/to-prd` next" if `mattpocock:to-prd` is installed at `~/.codex/skills/to-prd/`.
 - **Downstream builders:** `mattpocock:tdd`, `codex exec` for autonomous, or manual implementation.
 - **Cross-model dependency:** Phase 7.6 uses `claude -p` (npm `@anthropic-ai/claude-code`) and/or a diverse OpenRouter model (`OPENROUTER_API_KEY`). Without either — fallback to `roles/spec-validator.md` via `codex exec -`.
@@ -378,10 +365,10 @@ Would this plan pass review by a senior engineer who has to build the system fro
 - Does every task have a concrete `Done when:` shell proof (not "it works", not "manual check")?
 - No placeholders (`TBD`, `...`, `[NEEDS CLARIFICATION]`, `<insert here>`)?
 - **Was the step 5 Scope-cut audit run**, with every detected deferral (`[later]`, `Non-goals` items, dropped input features/edge cases) confirmed by the user via TUI prompt? No silent deferral.
-- **Was the step 5 ADR candidate detection run?** Hard-to-reverse + surprising + real-trade-off decisions surfaced (max 3); existing ADRs respected or conflicts flagged.
+- Were hard-to-reverse decisions noted inline in `## Risks` (one line each), not `docs/adr/` files?
 - Is every task atomic — 1-3 files, single purpose, closeable by an independent worker without questions to the author?
 - Does the **reference file** carry an honest `## Assumptions & open questions` (ranked), with blocking `❓ NEEDS YOU` also surfaced in the tasks file's `## Open questions`? (or one file only if the spec was trivial)
-- Two files written — `<spec>.md` (tasks, self-sufficient) + `<spec>.reference.md` (context) — or one file only if the spec was trivial?
+- Plan written as a flat `<spec-stem>/` directory (`tasks.md` + `reference.md`) — or a single `<spec>.md` if trivial; no nested subdirs?
 - Did Phase 7.6 pass (or was it explicitly skipped with reasoning)?
 - Coverage: does every Overview item have at least one task? Does every task track back to Overview / a requirement?
 - Was the user offered keep-or-delete `<spec>.bak` at step 10?

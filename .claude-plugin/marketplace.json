@@ -8,7 +8,7 @@
       "name": "iron-skills",
       "source": "./",
       "description": "Battle-tested skills for AI coding agents in Claude Code and Codex CLI.",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "category": "development",
       "keywords": [
         "cleanup",

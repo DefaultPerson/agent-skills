@@ -20,10 +20,9 @@ Portions of this work are adapted from third-party sources:
   into skills/autoresearch/references/codex-integration.md.
   https://github.com/openai/codex-plugin-cc
 
-- mattpocock/skills `improve-codebase-architecture` (MIT) —
-  the Ousterhout-derived architecture vocabulary and deepening patterns,
-  and the ADR decision criteria. Adapted into skills/deepen/ (and
-  referenced by skills/blueprint/).
+- mattpocock/skills `grill-with-docs` (MIT) — the sharpen / terminology /
+  cross-reference rules used in /blueprint's questioner and decomposition.
+  Adapted into skills/blueprint/.
   https://github.com/mattpocock/skills
 
 - Cursor team-kit `thermo-nuclear-code-quality-review`

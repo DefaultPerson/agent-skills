@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 — 2026-06-20
+
+De-formalized `/blueprint`. Dropped the ADR machinery entirely (no more
+`docs/adr/NNNN-*.md` files, detection, or `adr-format.md`) — hard-to-reverse
+decisions are now a one-line note in the plan's `## Risks`. Dropped the
+`.out-of-scope/` file tree (and `out-of-scope-format.md`) — confirmed scope cuts
+are recorded inline under `## Non-goals`. New output rule: when the plan is more
+than one file it goes in a **flat directory `<spec-stem>/`** (`tasks.md` +
+`reference.md`), no nested subdirs; a trivial spec stays a single `<spec>.md`.
+`/verify-done` and `/goal-prep` updated to resolve the directory form. LICENSE
+mattpocock attribution corrected (deepen was removed in 0.3.0).
+
 ## 0.6.0 — 2026-06-20
 
 New `/ship` skill — an autonomous end-to-end orchestrator. Hand it one freeform task

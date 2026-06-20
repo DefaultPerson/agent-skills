@@ -32,7 +32,7 @@ This is the **Codex CLI variant**. Behaviourally identical to the Claude variant
 /verify-done [<plan-or-spec path>] [--deep] [--block-on-quality]
 ```
 
-- No path → locate the most recent `/blueprint` tasks file (`<spec>.md`) or `goal.md`; **or** use a plain plan-mode / inline plan / "the diff + what it was meant to do" from the conversation. Ask via a numbered TUI prompt only if intent is genuinely unclear.
+- No path → locate the most recent `/blueprint` tasks file (`<spec-stem>/tasks.md`, or a single `<spec>.md`) or `goal.md`; **or** use a plain plan-mode / inline plan / "the diff + what it was meant to do" from the conversation. Ask via a numbered TUI prompt only if intent is genuinely unclear.
 - `--deep` → Tier 2 across all requirements + adversarial inputs (default **light**).
 - `--block-on-quality` → high-severity Tier 3 findings flip to NOT-DONE (default: Tier 3 **advisory**).
 
@@ -45,7 +45,7 @@ This is the **Codex CLI variant**. Behaviourally identical to the Claude variant
 
 ## What it does
 
-1. **Resolve inputs** (**plan-source-agnostic**): EITHER a `/blueprint` tasks file `<spec>.md` (or `goal.md`) → parse `Done when:` lines into proofs, intent = sibling `<spec>.reference.md`; OR an unstructured plan (plan-mode/inline/just-the-diff) → there are no `Done when:` lines, so **derive** a few concrete shell proofs from what the plan promises and use the plan prose itself as the intent (pass it into any `codex exec -` subprocess explicitly — subprocesses don't see your session). Always grab `build/test/regression` from the repo. Plus: a sandbox (throwaway `git worktree` if possible, else temp dir, else `none`); knobs `--deep`/`--block-on-quality`; read `roles/quality-review.md`.
+1. **Resolve inputs** (**plan-source-agnostic**): EITHER a `/blueprint` plan — `<spec-stem>/tasks.md` (+ `<spec-stem>/reference.md`), or a single `<spec>.md` — (or `goal.md`) → parse `Done when:` lines into proofs, intent = the `reference.md` (or the single file itself); OR an unstructured plan (plan-mode/inline/just-the-diff) → there are no `Done when:` lines, so **derive** a few concrete shell proofs from what the plan promises and use the plan prose itself as the intent (pass it into any `codex exec -` subprocess explicitly — subprocesses don't see your session). Always grab `build/test/regression` from the repo. Plus: a sandbox (throwaway `git worktree` if possible, else temp dir, else `none`); knobs `--deep`/`--block-on-quality`; read `roles/quality-review.md`.
 2. **Run the three tiers sequentially:**
    - **Tier 1 — Conformance:** run each `Done when:` proof (explicit or derived) + build/test/regression in the sandbox → `PASS|FAIL|UNKNOWN` per check. With an unstructured plan and nothing derivable, Tier 1 falls back to build/test only; if those are absent too it's empty → verdict leans on Tier 2 (report it).
    - **Tier 2 — Independent scenarios:** from the ORIGINAL intent, generate risk-ranked user-case/edge/adversarial scenarios (light by default; `--deep` widens). Each scenario must be **grounded** in a quote from the intent (drop+count ungrounded). Run the runnable ones in the sandbox; the rest are honest UNKNOWN. Use `codex exec -` subprocesses to parallelize generation/runs if helpful.
@@ -72,7 +72,7 @@ VERDICT: DONE | NOT-DONE — <reason>
 
 ## Connections
 
-- **Input:** a `/blueprint` plan (`<spec>.md` + `<spec>.reference.md`) or a `goal-prep` charter (which writes "hand finished work to `/verify-done`").
+- **Input:** a `/blueprint` plan (a `<spec-stem>/` directory with `tasks.md` + `reference.md`, or a single `<spec>.md`) or a `goal-prep` charter (which writes "hand finished work to `/verify-done`").
 - **Per-stage vs end:** lightweight per-stage `Done when:` lives in execution (seeded by goal-prep); `/verify-done` is the holistic END gate — don't run it per stage.
 - **NOT** `/verify` / `/code-review` / `/blueprint` Phase 7.6 (which reviews the *plan*; `/verify-done` reviews the *result*).
 

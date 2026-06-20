@@ -4,14 +4,16 @@ In step 3, blueprint decomposes the spec into tasks. The format adapts to the sp
 
 > **Readable, not ceremonial.** Write tasks like a plan a teammate can act on, not a compliance document. The rigor lives in the `Done when:` shell proof — not in scaffolding words. No `AC-N.N` numbering, no `Given/When/Then` boilerplate, no `Proof:` label. One plain sentence + one command.
 
-## Output: two files (tasks + reference)
+## Output: a plan directory (tasks + reference)
 
-blueprint writes the plan as **two** files (step 6), for context economy — executors / per-stage sub-agents / `/verify-done` / goal-prep load only the lean tasks file:
+blueprint writes the plan as **two** files (step 6), for context economy — executors / per-stage sub-agents / `/verify-done` / goal-prep load only the lean tasks file. **More than one file ⇒ a flat directory `<spec-stem>/`** (no nested subdirs); a trivial spec stays a single `<spec>.md`:
 
-- **`<spec>.md` — tasks file (PRIMARY):** a `> Context: see <spec>.reference.md` pointer line, an optional `## Open questions` block (blocking `❓ NEEDS YOU` only), and `## Tasks`. Each task is **self-sufficient** — executable from this file alone (`Done when:` IS the acceptance). This is the downstream contract.
-- **`<spec>.reference.md` — reference:** `## Overview`, full `## Requirements`, Terminology, `## Assumptions & open questions`, `## Risks`, ADR links. Read-once "why".
+- **`<spec-stem>/tasks.md` — tasks file (PRIMARY):** a `> Context: see reference.md` pointer line, an optional `## Open questions` block (blocking `❓ NEEDS YOU` only), and `## Tasks`. Each task is **self-sufficient** — executable from this file alone (`Done when:` IS the acceptance). This is the downstream contract.
+- **`<spec-stem>/reference.md` — reference:** `## Overview`, full `## Requirements`, Terminology, `## Assumptions & open questions`, `## Risks`, `## Non-goals`. Read-once "why".
 
-A task cites a requirement by light id (`R1`) only when it genuinely depends on one — don't add IDs for their own sake. Trivial / single-component specs may stay one file (fold the reference sections into `<spec>.md`); downstream resolves by preferring `<spec>.md` and treating it as both when no `<spec>.reference.md` exists.
+Downstream readers resolve the tasks file as `<spec-stem>/tasks.md` (directory form) or `<spec>.md` (single-file fallback).
+
+A task cites a requirement by light id (`R1`) only when it genuinely depends on one — don't add IDs for their own sake. Trivial / single-component specs may stay a single `<spec>.md` (reference sections folded in); otherwise the plan is a flat `<spec-stem>/` directory. Downstream resolves the tasks file as `<spec-stem>/tasks.md` (directory form) or `<spec>.md` (single file).
 
 ## Product spec format
 

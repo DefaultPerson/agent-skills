@@ -56,8 +56,8 @@ Allowed actions:
   `go.mod`, `CLAUDE.md`, `AGENTS.md` at the **repo root only**, for shape
   detection — not content for the task.
 - Reading a **plan/spec file handed in as the goal input** — a `/blueprint`
-  tasks file `<spec>.md` (via `--from`, or named in the request) and its
-  optional `<spec>.reference.md`. That's the goal's specification, not
+  tasks file (`<spec-stem>/tasks.md`, or a single `<spec>.md`) via `--from`
+  or named in the request, and its optional `reference.md`. That's the goal's specification, not
   implementation code — reading it is intake, not execution (see Phase 5.1).
 - Asking diagnostic intake questions via `AskUserQuestion`.
 - Creating only `<cwd>/.ags/<slug>/{goal.md, run.txt, notes/}`.
@@ -245,13 +245,13 @@ Create directory + empty `notes/` for future user artifacts.
 
 ### Phase 5.1 — Derive completion from a `/blueprint` plan (when applicable)
 
-If the goal input is a `/blueprint` **tasks file** — passed via `--from <spec>.md`, or named in `intake.existing_plan_facts` — detect it **structurally**: the file contains `### TASK-{N}` headers AND `Done when:` lines (don't trigger on a lone keyword). Reading this plan file is intake, not execution — it's the goal's specification.
+If the goal input is a `/blueprint` **tasks file** — passed via `--from <spec-stem>/tasks.md` (or `<spec>.md`), or named in `intake.existing_plan_facts` — detect it **structurally**: the file contains `### TASK-{N}` headers AND `Done when:` lines (don't trigger on a lone keyword). Reading this plan file is intake, not execution — it's the goal's specification.
 
 When detected:
 
 - Set `intake.completion_proof` = "every task's `Done when:` proof passes (each PASS — none FAIL/UNKNOWN) and every `[must]` requirement is satisfied", reusing blueprint's **PASS / FAIL / UNKNOWN** vocabulary (`skills/blueprint/references/task-format.md`).
 - Capture one audit row per `### TASK-{N}` (Requirement = task title, Evidence = its `Done when:` command) — Phase 8.5 pre-fills the audit table from these.
-- Read the **tasks file** (`<spec>.md`) for the proofs; if a sibling `<spec>.reference.md` exists you may read it for non-goals/context, but completion comes from the tasks file's `Done when:` lines — never from the implementation the tasks point at.
+- Read the **tasks file** (`<spec-stem>/tasks.md`, or `<spec>.md`) for the proofs; if a sibling `reference.md` exists you may read it for non-goals/context, but completion comes from the tasks file's `Done when:` lines — never from the implementation the tasks point at.
 
 This makes the charter's completion gate an objective projection of the plan, not hand-written prose. (Non-blueprint goals keep deriving `completion_proof` from intake as before.)
 

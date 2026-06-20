@@ -91,7 +91,7 @@ Record the chosen chain + why in a short decisions log (shown at the end).
 Drive each step in order. When you invoke a chained skill, **pass the autonomy
 directive** so it behaves consistently:
 - **guided / autopilot:** the sub-skill must **not** stop to ask — resolve its own
-  gates (blueprint's scope-cut audit, extract's link triage, ADR offers, etc.)
+  gates (blueprint's scope-cut audit, extract-links' link triage, etc.)
   using the upfront answers + sensible defaults, and **log each decision** instead
   of prompting. (In *guided* you already gathered the real forks up front; in
   *autopilot* you decide them.)
