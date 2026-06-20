@@ -1,0 +1,18 @@
+# extract skill output (shared parent per dir: <note-dir>/extracted/<note-basename>/<slug>/)
+extracted/
+
+# orphaned ralph-loop state from prior versions — safe to delete manually
+.claude/ralph-loop.local.md
+
+# /babysit per-project runtime state (config, log cursor, incidents, alert loop)
+.babysit/
+
+# Python bytecode cache (verify-*.py scripts)
+__pycache__/
+*.pyc
+
+# /goal-prep + /autoresearch (absorbed from ags) per-project runtime state
+.ags/
+autoresearch-scratchpad.md
+autoresearch-history.tsv
+.autoresearch.lock
