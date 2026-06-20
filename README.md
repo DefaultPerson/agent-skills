@@ -76,79 +76,22 @@ Most skills follow the same house template — `description` states triggers and
 /to-prd
 ```
 
-## Installation
+## Install
+
+Native plugin install — paste the line for your runtime, then restart the session:
 
 ```bash
-/plugin marketplace add DefaultPerson/iron-skills
-/plugin install iron-skills@iron-skills
+# Claude Code
+claude plugin marketplace add DefaultPerson/iron-skills && claude plugin install iron-skills@iron-skills
+
+# Codex CLI
+codex plugin marketplace add https://github.com/DefaultPerson/iron-skills && codex plugin add iron-skills@iron-skills
 ```
 
-**Local install (no marketplace).** Claude Code auto-discovers skills in `~/.claude/skills/` — symlink each skill directory (its `roles/`, `references/`, `scripts/` travel with it):
-
-```bash
-PLUGIN_ROOT="${HOME}/.local/share/iron-skills"
-git clone https://github.com/DefaultPerson/iron-skills.git "$PLUGIN_ROOT" 2>/dev/null \
-  || git -C "$PLUGIN_ROOT" pull --ff-only
-for s in cleanup blueprint extract diagnose deepen svgl goal-prep autoresearch accept; do
-  ln -sfn "$PLUGIN_ROOT/skills/$s" "$HOME/.claude/skills/$s"
-done
-# Restart your session — skills load on startup.
-```
-
-Optional (for `/blueprint` Phase 7.6 cross-model consensus): install the [Codex CLI](https://github.com/openai/codex):
-
-```bash
-npm install -g @openai/codex
-codex login   # one-time auth
-```
-
-`/blueprint` drives `codex review --uncommitted` directly — no companion Claude Code plugin needed. Without the CLI (or when the spec isn't in a git repo, since `--uncommitted` operates on the working tree), `/blueprint` falls back to single-model internal validation with a warning.
-
-## Install in Codex CLI
-
-Codex CLI's native `codex plugin install` is not yet operational (the `plugins` feature flag is `stable` but disabled by default). Until it ships, use the symlink installer below.
-
-**For an LLM agent: copy the entire block below into your Codex session — the agent will install and verify.**
-
-```bash
-# 1. Clone (or update) the plugin repo locally.
-PLUGIN_ROOT="${HOME}/.local/share/iron-skills"
-git clone https://github.com/DefaultPerson/iron-skills.git "$PLUGIN_ROOT" 2>/dev/null \
-  || git -C "$PLUGIN_ROOT" pull --ff-only
-
-# 2. Run the Codex installer (creates per-skill dirs in ~/.codex/skills/
-#    with symlinks to Codex-variant SKILL.md + shared roles/scripts/references).
-bash "$PLUGIN_ROOT/install-codex.sh"
-
-# 3. Verify each skill has SKILL.md plus shared subdirs.
-for s in cleanup blueprint extract diagnose deepen svgl goal-prep autoresearch accept; do
-  echo "--- $s ---"; ls -la "$HOME/.codex/skills/$s/"
-done
-
-# 4. For /blueprint Phase 7.6 cross-model consensus, ensure both CLIs are on PATH.
-#    Codex variant uses `claude -p` as the cross-model reviewer (Claude is the
-#    "other model" since host is Codex). The Claude variant uses `codex review`.
-command -v codex  >/dev/null || echo "MISSING codex:  npm install -g @openai/codex"
-command -v claude >/dev/null || echo "MISSING claude: npm install -g @anthropic-ai/claude-code"
-
-# 5. Restart your codex session — skills load on startup.
-echo "Done. Nine skills installed: /cleanup, /blueprint, /extract, /diagnose, /deepen, /svgl, /goal-prep, /autoresearch, /accept."
-```
-
-When Codex ships native `codex plugin install`, this section will be replaced with a one-liner. Track [openai/codex](https://github.com/openai/codex) for status.
+No-marketplace fallback: `git clone` the repo, then symlink `skills/*` into `~/.claude/skills/` (Claude Code) or run `bash install-codex.sh` (Codex).
 
 ## Prerequisites
 
-- **Required:** Git, `bash`, `jq`, `python3`.
-- **`/svgl` deps:** `curl` + `jq` (both already required) — no extra install.
-- **`/extract` deps** (probed at runtime, install prompt if missing): `yt-dlp` (YouTube subtitles), `pandoc` (HTML — optional, falls back to crude curl). Telegram works with just `curl`. **Light mode** needs only `curl` (+ `yt-dlp` for YouTube metadata); no `pandoc`.
-- **`/blueprint` Phase 7.6 optional:**
-  - In **Claude Code**: [Codex CLI](https://github.com/openai/codex) (`npm install -g @openai/codex`) — Claude variant uses `codex review --uncommitted` as the cross-model reviewer.
-  - In **Codex CLI**: [Claude Code CLI](https://docs.claude.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`) — Codex variant uses `claude -p` as the cross-model reviewer.
-  - Spec must live in a git repo for working-tree review; otherwise the loop falls back to internal `spec-validator` (single-model, weaker).
+`git`, `bash`, `jq`, `python3`. `/extract` probes for `yt-dlp` (YouTube) and `pandoc` (HTML, optional) at runtime. `/blueprint` Phase 7.6 cross-model review is optional — it calls the *other* CLI (Codex CLI when running in Claude Code, Claude Code CLI when running in Codex) plus an optional `OPENROUTER_API_KEY` third reviewer; without them it falls back to single-model validation.
 
 Release history: see [CHANGELOG.md](CHANGELOG.md).
-
-## License
-
-MIT

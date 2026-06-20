@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0 — 2026-06-20
+
+Native Codex CLI plugin packaging — `codex plugin marketplace add` + `codex plugin add`
+install iron-skills directly (each Codex skill is self-contained, built from the Claude
+tree by `ci/build-codex.sh`). README install simplified to one block per runtime.
+
 ## 0.1.0 — 2026-06-19
 
 First release under the iron-skills name. Nine skills for AI coding agents

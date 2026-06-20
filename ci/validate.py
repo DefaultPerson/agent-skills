@@ -138,10 +138,35 @@ if plugin and marketplace:
            str(sorted(map(str, versions))))
     plugin_name = plugin.get("name")
 
+# Codex plugin manifest (skills-codex/.codex-plugin/plugin.json) + marketplace
+# manifest (.agents/plugins/marketplace.json) must agree with the Claude side.
+cx = cmkt = None
+try:
+    cx = json.loads(read(ROOT / "skills-codex" / ".codex-plugin" / "plugin.json"))
+    record(True, ".codex-plugin/plugin.json parses")
+except Exception as e:
+    record(False, ".codex-plugin/plugin.json parses", str(e))
+try:
+    cmkt = json.loads(read(ROOT / ".agents" / "plugins" / "marketplace.json"))
+    record(True, ".agents/plugins/marketplace.json parses")
+except Exception as e:
+    record(False, ".agents/plugins/marketplace.json parses", str(e))
+if cx and plugin:
+    record(cx.get("name") == plugin.get("name") and cx.get("version") == plugin.get("version"),
+           "codex plugin.json name+version agree with .claude-plugin",
+           f"codex={cx.get('name')}@{cx.get('version')} claude={plugin.get('name')}@{plugin.get('version')}")
+    record(cx.get("skills") == "./", 'codex plugin.json skills == "./"', str(cx.get("skills")))
+if cmkt and plugin_name:
+    cp0 = (cmkt.get("plugins") or [{}])[0]
+    src = (cp0.get("source") or {}).get("path")
+    record(cp0.get("name") == plugin_name and src == "./skills-codex",
+           'codex marketplace plugins[0] name + source.path == "./skills-codex"',
+           f"name={cp0.get('name')} path={src}")
+
 # ── 2. parity (skills ↔ skills-codex ↔ install-codex.sh) ──
 section("skills ↔ skills-codex ↔ install-codex.sh parity")
-sk = {p.name for p in (ROOT / "skills").iterdir() if p.is_dir()}
-ck = {p.name for p in (ROOT / "skills-codex").iterdir() if p.is_dir()}
+sk = {p.name for p in (ROOT / "skills").iterdir() if p.is_dir() and not p.name.startswith(".")}
+ck = {p.name for p in (ROOT / "skills-codex").iterdir() if p.is_dir() and not p.name.startswith(".")}
 record(sk == ck, "same skill set in skills/ and skills-codex/",
        (f"claude-only: {sorted(sk - ck)} | codex-only: {sorted(ck - sk)}") if sk != ck else f"{len(sk)} skills")
 
@@ -158,7 +183,7 @@ else:
 # ── 3. SKILL.md frontmatter ──
 section("SKILL.md frontmatter (name==dir, description 1..%d chars)" % DESC_CAP)
 for tree in ("skills", "skills-codex"):
-    for d in sorted(p for p in (ROOT / tree).iterdir() if p.is_dir()):
+    for d in sorted(p for p in (ROOT / tree).iterdir() if p.is_dir() and not p.name.startswith(".")):
         f = d / "SKILL.md"
         label = f"{tree}/{d.name}/SKILL.md"
         if not f.exists():
@@ -240,6 +265,28 @@ for tree in ("skills", "skills-codex"):
                 if not (f.parent / mm.group(1)).exists():
                     bad_paths.append(f"{rel(f)}:{n} -> {mm.group(1)}")
 record(not bad_paths, "Workflow scriptPath: pointers resolve", " ".join(bad_paths[:5]))
+
+# ── 6b. Codex packaging: skills-codex assets are self-contained + in sync ──
+# `codex plugin add` copies the plugin and strips symlinks, so each Codex skill
+# carries real copies of its references/scripts/templates/roles (built by
+# ci/build-codex.sh from skills/). Assert no drift, and that workflows/ (no
+# Workflow tool on Codex) never leaks into the Codex tree.
+section("codex packaging (skills-codex assets in sync with skills/)")
+CODEX_ASSETS = ("references", "scripts", "templates", "roles")
+drift = []
+for name in sorted(ck):
+    for sub in CODEX_ASSETS:
+        cdir = ROOT / "skills-codex" / name / sub
+        if not cdir.is_dir():
+            continue
+        for cf in cdir.rglob("*"):
+            if cf.is_file() and "__pycache__" not in cf.parts:
+                srcf = ROOT / "skills" / name / cf.relative_to(ROOT / "skills-codex" / name)
+                if not srcf.is_file() or srcf.read_bytes() != cf.read_bytes():
+                    drift.append(str(cf.relative_to(ROOT)))
+record(not drift, "skills-codex assets byte-identical to skills/ (run ci/build-codex.sh)", " ".join(drift[:5]))
+wf_leak = [str(p.relative_to(ROOT)) for p in (ROOT / "skills-codex").rglob("workflows") if p.is_dir()]
+record(not wf_leak, "no workflows/ under skills-codex (Codex has no Workflow tool)", " ".join(wf_leak[:5]))
 
 # ── 7. syntax (py / workflow js / bash) across functional dirs + root ──
 section("syntax (py / workflow js / bash)")
