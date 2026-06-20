@@ -23,19 +23,33 @@ def main():
     errors = []
     warnings = []
 
-    # Two-file layout (Part D): tasks file <base>.md + a sibling <base>.reference.md.
+    # Plan layout, in resolution order:
+    #   directory form (v0.7.0 default): <spec-stem>/tasks.md + <spec-stem>/reference.md
+    #   legacy sibling form:             <base>.md      + <base>.reference.md
+    #   single-file:                     <spec>.md      (reference sections folded in)
     base = spec_path[:-3] if spec_path.endswith(".md") else spec_path
-    ref_path = base + ".reference.md"
+    spec_dir = os.path.dirname(spec_path)
+    spec_name = os.path.basename(spec_path)
 
     # If handed the reference file directly, validate it as context-only and stop.
-    if spec_path.endswith(".reference.md"):
+    if spec_name == "reference.md" or spec_path.endswith(".reference.md"):
         if "## Overview" not in content:
             print("FAIL: reference file missing ## Overview")
             sys.exit(1)
         print("PASS: reference file (context) looks well-formed")
         sys.exit(0)
 
+    ref_candidates = []
+    if spec_name == "tasks.md":                       # directory form
+        ref_candidates.append(os.path.join(spec_dir, "reference.md"))
+    ref_candidates.append(base + ".reference.md")     # legacy sibling form
+    ref_path = next((p for p in ref_candidates if os.path.exists(p)), ref_candidates[0])
     two_file = os.path.exists(ref_path)
+
+    ref_content = ""
+    if two_file:
+        with open(ref_path) as rf:
+            ref_content = rf.read()
 
     # --- Required sections (structural) ---
     #   two-file mode: Overview/Requirements live in the reference → require only ## Tasks here
@@ -44,10 +58,8 @@ def main():
     for section in required:
         if section not in content:
             errors.append(f"Missing required section: {section}")
-    if two_file:
-        with open(ref_path) as rf:
-            if "## Overview" not in rf.read():
-                errors.append(f"reference file {os.path.basename(ref_path)} missing ## Overview")
+    if two_file and "## Overview" not in ref_content:
+        errors.append(f"reference file {os.path.basename(ref_path)} missing ## Overview")
 
     # Product specs (user stories or a Requirements section) — recommend linkage
     is_product = bool(re.search(r'^## User Stories', content, re.MULTILINE))
@@ -93,6 +105,64 @@ def main():
 
     if is_product and not has_requirements:
         warnings.append("Product spec has '## User Stories' but no '## Requirements' section")
+
+    # --- Navigation layer: `## Needs your attention` + `## Task index` (v0.8.0) ---
+    real_task_nums = {m.group(1) for _, tid in task_starts
+                      if (m := re.search(r'TASK-(\d+)', tid))}
+
+    # Blocking `→ blocks: TASK-n` references must point at a real task (dangling = FAIL:
+    # a builder acting on a phantom blocker is a real defect). `→ blocks: all` is allowed.
+    if "## Needs your attention" in content:
+        for i, line in enumerate(lines, 1):
+            m = re.search(r'(?:→|->)\s*blocks:\s*(.+)', line, re.IGNORECASE)
+            if not m or re.search(r'\ball\b', m.group(1)):
+                continue
+            for num in re.findall(r'TASK-(\d+)', m.group(1)):
+                if num not in real_task_nums:
+                    errors.append(f"Line {i}: '## Needs your attention' blocks a non-existent TASK-{num}")
+
+    # Task index rows (`- [ ] TASK-n`) should resolve, and every block should be indexed (WARN — drift).
+    if "## Task index" in content:
+        index_nums, in_index = set(), False
+        index_row = re.compile(r'\s*[-*]\s*\[[ xX]\]\s*\*{0,2}TASK-(\d+)')
+        for i, line in enumerate(lines, 1):
+            if line.startswith("## Task index"):
+                in_index = True
+                continue
+            if in_index and line.startswith("## "):
+                in_index = False
+            if in_index and (m := index_row.match(line)):
+                index_nums.add(m.group(1))
+                if m.group(1) not in real_task_nums:
+                    warnings.append(f"Line {i}: task index lists TASK-{m.group(1)} with no '### TASK-{m.group(1)}' block")
+        for num in sorted(real_task_nums - index_nums, key=int):
+            warnings.append(f"TASK-{num} has a block but is missing from the '## Task index'")
+
+    # Each `▸ AREA-n` / `▸ US-n` group header should appear once within ## Tasks (WARN — split-area bug).
+    if "## Tasks" in content:
+        in_tasks, seen_groups = False, {}
+        group_re = re.compile(r'▸\s*((?:AREA|US)-\d+)')
+        for line in lines:
+            if line.startswith("## Tasks"):
+                in_tasks = True
+                continue
+            if in_tasks and line.startswith("## ") and not line.startswith("## Tasks"):
+                in_tasks = False
+            if in_tasks and (m := group_re.search(line)):
+                seen_groups[m.group(1)] = seen_groups.get(m.group(1), 0) + 1
+        for key, n in sorted(seen_groups.items()):
+            if n > 1:
+                warnings.append(f"group header '▸ {key}' appears {n}× within ## Tasks — each area/story "
+                                "group should appear exactly once (split-area bug)")
+
+    # One attention surface: blocking items must NOT be duplicated into the reference (WARN).
+    if two_file:
+        if re.search(r'❓\s*\*{0,2}\s*NEEDS YOU', ref_content):
+            warnings.append(f"{os.path.basename(ref_path)} carries a blocking '❓ NEEDS YOU' — move it to "
+                            "tasks.md '## Needs your attention' (one attention surface, no duplication)")
+        if "## Assumptions & open questions" in ref_content:
+            warnings.append(f"{os.path.basename(ref_path)} uses old heading '## Assumptions & open questions' "
+                            "— rename to '## Assumptions' (ranked, non-blocking only)")
 
     # --- Style regressions toward the old ceremony (warn, don't fail) ---
     style = [

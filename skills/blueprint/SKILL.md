@@ -137,6 +137,17 @@ Each task cuts through ALL relevant layers end-to-end (schema → API → UI →
 ❌ **Horizontal:** TASK-1 "Add all DB columns"; TASK-2 "Add all API"; … Nothing demoable until task 3.
 ✅ **Vertical:** TASK-1 "Add email to User: column + API field + form + test"; TASK-2 "phone: same set."
 
+### Foundations first — don't start in mid-air, don't bury the scaffold
+
+A plan must not read like it begins half-built. The **first task** leaves the project **runnable and verifiable**, so every later `Done when:` has something to run against:
+
+- **Greenfield** (no test runner / build / entrypoint yet) → the first task creates the minimal skeleton + a smoke test; its `Done when:` proves a fresh clone goes green (e.g. `npm ci && npm test` exits 0 with ≥1 passing test; `uv run pytest -q` collects+passes one).
+- **Brownfield** (code already builds) → the first task is a one-line **baseline proof** that the existing build/test is green (`make test` exits 0) — cheap, and it pins the starting state `/verify-done` re-checks first. If truly trivial, state the starting state in the `> Context` pointer instead of a task.
+
+**No buried scaffold.** The test harness, fixtures, and CI entrypoint live in that first foundation task — later tasks reuse them via `**Leverage**: <foundation task> harness`, never re-create them as a side effect. If a task needs scaffolding that doesn't exist yet, that scaffolding belongs earlier, not smuggled into a feature task. (In the real run, the pytest scaffold was created in TASK-7 yet reused by TASK-16 — that's buried scaffold; it belongs first.)
+
+**Order, don't graph.** Group by area; each area appears **exactly once**; order tasks (and areas) so a genuine prerequisite always sits *above* what needs it. This ordering — plus an inline `after TASK-x` note in the index for a real data/file dependency — is the ONLY sequencing artifact. No Stages, no `[P]`, no dependency graph (removed in v2.0). If most tasks need `after …`, the slices are too horizontal — re-cut them.
+
 ### Behavioural `Done when:`, not procedural
 
 The proof describes what the system DOES (observable through its interface), not HOW. The reader writes the test from it without reading implementation prose.
@@ -144,19 +155,38 @@ The proof describes what the system DOES (observable through its interface), not
 ❌ **Procedural:** `Done when: middleware extracts the token, calls validateJWT(), returns 401.`
 ✅ **Behavioural:** `Done when: \`curl -H 'Auth: <expired>' :8080/me\` → 401 {error:"token_expired"}.`
 
-### Surface assumptions & open questions
+### One place for what needs a human — `## Needs your attention`
 
-Put an **`## Assumptions & open questions`** section in the **reference file** (`reference.md`); surface any *blocking* `❓ NEEDS YOU` items also in the tasks file's `## Open questions` so they can't be missed before execution. Borrowed from fusion. A planner can't verify everything; be honest about it instead of guessing silently:
+Everything that needs **you** (the reader) before or during execution goes in **one** block at the top of the tasks file — never scattered across both files and a dozen per-task `Status:` lines. A planner can't verify everything; be honest in one place instead of guessing silently or hiding the doubt inside task bodies.
 
-- List each assumption with a confidence (high / medium / low) and what it's based on.
-- Mark genuine human-decision points with `❓ NEEDS YOU:` — these are forks the model shouldn't pick alone.
+`tasks.md` → **`## Needs your attention`** (only if it has content — omit the heading entirely on a clean plan). Two kinds of line:
+
+- **Blocking forks** — `❓ NEEDS YOU` decisions/unknowns the model must not pick alone. One line each, ending in **`→ blocks: TASK-n[, TASK-m]`** (or `→ blocks: all` for a global gate like a foundational spike). This is the machine-greppable wiring that ties a question to what it freezes.
+- **HITL tasks** — one line per task that needs human judgment (architecture call, external access, manual review): `TASK-n — title (why)`. Aggregated here so a reader sees up front what they can't delegate.
+
+`reference.md` → **`## Assumptions`** — the ranked, **non-blocking** assumptions only (high / medium / low + what each is based on). The blocking `❓ NEEDS YOU` items do **NOT** appear here — they live solely in `tasks.md` `## Needs your attention`. No item in both files.
 
 ```markdown
-## Assumptions & open questions
+# tasks.md
+## Needs your attention
+- ❓ NEEDS YOU [decision]: is DELETE admin-only? (input was ambiguous) → blocks: TASK-11
+- ❓ NEEDS YOU [unknown]: spike — does the bus handle 10k msg/s at our payload? → blocks: all
+- HITL: TASK-3 — auth design call (pick session vs bearer before building)
+
+# reference.md
+## Assumptions
 - Assume Postgres (high — matches src/db).
 - Assume JWT, not sessions (medium — input didn't say).
-- ❓ NEEDS YOU: is DELETE admin-only? (input was ambiguous)
 ```
+
+### A task index at the top of `## Tasks`
+
+After `## Needs your attention`, before the full task blocks, write **`## Task index`** — a checklist so the whole plan is visible and trackable at a glance, and so blocked-on / HITL flags live in one scannable place instead of buried in each block:
+
+- One line per task: **`- [ ] TASK-n — short title`** (≤ ~6 words; the full title lives once in the `### TASK-n` block). Use a GFM checkbox so it doubles as progress tracking.
+- Use **bare `TASK-n`**, never `### TASK-n` — a `###` here would double-count in `verify-spec.py` and `goal-prep`.
+- Grouped under the same `**▸ AREA-n**` (or `**US-n**`) headers as `## Tasks`, **each group exactly once**, foundations-first.
+- Light inline flags only: `· after TASK-x` (a real prerequisite), `· HITL`, `· ❓` (gated by a `## Needs your attention` item). No graph, no `[P]`, no Stages.
 
 ## Roles
 
@@ -221,11 +251,11 @@ $(cat "$spec_path")"
 
 1. **Read and analyze the spec.** Validate (markdown, has `## ` headers, no cleanup markers `[MISSING]`/etc), classify type (product / technical / small), scan the codebase if present, flag `[NEEDS CLARIFICATION]` items.
 2. **Challenge + ask** (hard gate). Run the multi-angle challenge (don't-build / simpler / future-dependent / scenarios). Then ask the user what's unclear — max 5 questions via AskUserQuestion, format in `roles/questioner.md`. If the spec is already clear and the framing is sound — skip.
-3. **Decompose into atomic tasks.** Format adapts to type — details in `references/task-format.md`. Main rule: each task touches 1-3 files (a vertical slice) and has a `Done when:` line with a runnable shell proof. No `[P]` markers, Stages, `AC-N.N`, or `Given/When/Then` — those are gone.
+3. **Decompose into atomic tasks.** Format adapts to type — details in `references/task-format.md`. Main rule: each task touches 1-3 files (a vertical slice) and has a `Done when:` line with a runnable shell proof. **Foundations first** — the first task leaves the project runnable/green (greenfield: skeleton + smoke test; brownfield: a baseline proof), the harness lives there and is reused, never buried in a later task. Order so prerequisites precede dependents; each area appears exactly once. No `[P]` markers, Stages, `AC-N.N`, or `Given/When/Then` — those are gone.
 4. **Pin requirements & contracts.** Plain sentences tagged `[must]`/`[nice]`/`[later]` (light `R1`/`R2` ids only if a big spec needs links). Skip if the spec is small or single-component. Details in `references/contracts.md`.
 5. **Self-review checklist.** Placeholder scan, internal consistency, ambiguity check, and a **hard-gate Scope-cut audit (user-facing)**.
 
-   **Hard-to-reverse decisions** (no ceremony). If a task locks in a choice that's costly to undo and carries a real trade-off (DB schema, public API contract, auth/infra/messaging choice, security boundary, major dependency lock-in), record it in **one line** in the reference file's `## Risks` — what was chosen + the trade-off. A genuine fork you shouldn't pick alone already goes to `## Assumptions & open questions` as `❓ NEEDS YOU`. **No `docs/adr/` files, no numbering, no template.**
+   **Hard-to-reverse decisions** (no ceremony). If a task locks in a choice that's costly to undo and carries a real trade-off (DB schema, public API contract, auth/infra/messaging choice, security boundary, major dependency lock-in), record it in **one line** in the reference file's `## Risks` — what was chosen + the trade-off. A genuine fork you shouldn't pick alone already goes to the tasks file's `## Needs your attention` as `❓ NEEDS YOU` (with `→ blocks: TASK-n`). **No `docs/adr/` files, no numbering, no template.**
 
    The **Scope-cut audit (user-facing)** scans the in-memory plan for deferral signals:
    - Requirements tagged `[later]`, or `[must]`/`[nice]` carrying phrases `(v2)`, `(future)`, `(deferred)`, `(later)`, `(stretch goal)`, `(MVP only)`, `(out of scope for now)`, `(not for now)`.
@@ -234,8 +264,8 @@ $(cat "$spec_path")"
 
    If any signal is found, surface a batched AskUserQuestion (multiSelect=false, one question per item, up to 4 per call — batch into multiple calls if more) with options `Keep deferred (current)` / `Include in v1` / `Drop entirely` / `Drop (record in the plan)`. Apply user decisions to the in-memory plan. For `Drop (record in the plan)`, note it in one line under the reference file's `## Non-goals` (what + why) — no separate files. Loop back to step 3/4 if scope changes require re-decomposition. NEVER write to disk while scope cuts are unconfirmed. If the audit finds nothing — gate silently passes.
 6. **Write the plan.** Back up the original (`<spec>.bak`). The plan is normally **two files** (context economy — executors/sub-agents/`/verify-done`/goal-prep load only the lean tasks file, not the whole plan). **When the plan is more than one file, put them in a flat directory `<spec-stem>/`** (named after the spec, e.g. `auth-spec.md` → `auth-spec/`) — **no nested subdirectories**; everything for this plan lives at that one level. A trivial spec that fits one file stays as `<spec>.md` (no directory).
-   - **`<spec-stem>/tasks.md` — tasks file (PRIMARY, executable, trackable):** a `> Context: see reference.md` pointer line; a `## Open questions` block IF blocking `❓ NEEDS YOU` items remain; `## Tasks` where each task is **self-sufficient** (title, `**Files**`, `Done when:` shell proof, inline `Edge:`). This is the downstream contract — native `/goal`, per-stage sub-agents, `/verify-done`, and goal-prep all read THIS file.
-   - **`<spec-stem>/reference.md` — reference (read-once context):** `## Overview` narrative, full `## Requirements` (`[must]/[nice]/[later]` + rationale), Terminology, `## Assumptions & open questions` (ranked), `## Risks` (hard-to-reverse decisions noted here), and `## Non-goals` (confirmed scope cuts).
+   - **`<spec-stem>/tasks.md` — tasks file (PRIMARY, executable, trackable).** In this order: a `> Context: see reference.md` pointer line; **`## Needs your attention`** (only if it has content — blocking `❓ NEEDS YOU` forks each ending in `→ blocks: TASK-n`, plus one line per HITL task); **`## Task index`** (a `- [ ] TASK-n — short title` checklist, grouped by area exactly once, foundations-first, light `· after TASK-x` / `· HITL` / `· ❓` flags); then **`## Tasks`** where each task is **self-sufficient** (title, `**Files**`, `Done when:` shell proof, inline `Edge:`), grouped by `**▸ AREA-n**` (each area once, foundations-first; the depended-on/foundation task sorts to the top of its area). This is the downstream contract — native `/goal`, per-stage sub-agents, `/verify-done`, and goal-prep all read THIS file.
+   - **`<spec-stem>/reference.md` — reference (read-once context):** `## Overview` narrative, full `## Requirements` (`[must]/[nice]/[later]` + rationale), Terminology, **`## Assumptions`** (ranked **non-blocking** only — blocking `❓ NEEDS YOU` live in tasks.md `## Needs your attention`, never duplicated here), `## Risks` (hard-to-reverse decisions noted here), and `## Non-goals` (confirmed scope cuts).
    - **Single-file fallback:** a trivial spec → just `<spec>.md` (tasks only; no directory, no separate reference).
    - **Self-sufficiency rule:** a task must be executable from the tasks file ALONE (the `Done when:` IS the acceptance); the reference is only "why". Cross-ref a task → a requirement by light id (`R1`) only when it genuinely cites one.
    - **Threshold:** split when non-trivial (the default → directory form); a trivial / single-component spec may stay one file `<spec>.md`. Downstream readers resolve the tasks file as `<spec-stem>/tasks.md` (directory form) or `<spec>.md` (single file), and the reference as `<spec-stem>/reference.md` when present.
@@ -349,8 +379,8 @@ Output schema (defined by `roles/codex-reviewer.md` and `roles/openrouter-review
 
 ## Outputs
 
-- `<spec-stem>/tasks.md` — the **tasks file** (primary): the lean executable/trackable artifact (`## Tasks` + blocking `## Open questions`). Downstream reads this. (A trivial single-file spec stays as `<spec>.md`.)
-- `<spec-stem>/reference.md` — the **reference**: `## Overview` / `## Requirements` / `## Assumptions & open questions` / `## Risks` / `## Non-goals`. Omitted for a trivial single-file spec.
+- `<spec-stem>/tasks.md` — the **tasks file** (primary): the lean executable/trackable artifact — `## Needs your attention` (if any) + `## Task index` + `## Tasks`. Downstream reads this. (A trivial single-file spec stays as `<spec>.md`.)
+- `<spec-stem>/reference.md` — the **reference**: `## Overview` / `## Requirements` / `## Assumptions` (ranked, non-blocking) / `## Risks` / `## Non-goals`. Omitted for a trivial single-file spec.
 - `<spec>.bak` — original before enrichment. Created in step 6, lives through Phase 7.6, offered for deletion at step 10. If deleted, rollback goes through `git checkout HEAD -- <spec>` against the `pre-blueprint: <name>` snapshot.
 
 Git: `pre-blueprint: <name>` (snapshot before) and `blueprint: enrich <name>` (after step 6).
@@ -389,7 +419,9 @@ Would this plan pass review by a senior engineer who has to build the system fro
 - **Was the step 5 Scope-cut audit run**, with every detected deferral (`[later]`, `Non-goals` items, dropped input features/edge cases) confirmed by the user via AskUserQuestion? No silent deferral.
 - Were hard-to-reverse decisions noted inline in `## Risks` (one line each) — not turned into `docs/adr/` files?
 - Is every task atomic — 1-3 files, single purpose, closeable by an independent worker without questions to the author?
-- Does the **reference file** carry an honest `## Assumptions & open questions` (ranked), with blocking `❓ NEEDS YOU` also surfaced in the tasks file's `## Open questions`?
+- **Foundations first:** does the first task leave the project runnable/green (greenfield skeleton + smoke test, or brownfield baseline proof)? Is the test harness in that task and reused — not buried in a later one? Does each area appear exactly once, prerequisites before dependents?
+- **One attention surface:** are ALL blocking `❓ NEEDS YOU` items in tasks.md `## Needs your attention` (each with `→ blocks: TASK-n`) plus the HITL tasks — with NONE of them duplicated in reference.md? Does reference.md carry only the ranked **non-blocking** `## Assumptions`?
+- **Task index:** does tasks.md have a `## Task index` checklist (one `- [ ] TASK-n` line per task, bare ids not `###`, each area once) covering exactly the `### TASK-n` set — no orphan rows, no missing rows?
 - Plan written as a flat `<spec-stem>/` directory (`tasks.md` self-sufficient + `reference.md` context) — or a single `<spec>.md` if trivial; no nested subdirs?
 - Did Phase 7.6 pass (or was it explicitly skipped with reasoning)?
 - Coverage: does every Overview item have at least one task? Does every task track back to Overview / a requirement?

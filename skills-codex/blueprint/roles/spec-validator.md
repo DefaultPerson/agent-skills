@@ -14,8 +14,9 @@ If any external reviewer is available (Codex via `roles/codex-reviewer.md`, or a
 1. **Template compliance** — required sections present:
    - Overview (with original content from `.bak`)
    - Requirements (if multi-component) and any Non-goals
-   - Tasks (each with a `Done when:` shell proof)
-   - Assumptions & open questions
+   - Tasks (each with a `Done when:` shell proof), preceded by a `## Task index` checklist
+   - `## Needs your attention` in the tasks file IF any blocking `❓ NEEDS YOU` / HITL items exist (each blocker `→ blocks: TASK-n`); these must NOT be duplicated in the reference
+   - `## Assumptions` (ranked, non-blocking) in the reference
    - Risks
 2. **Task quality** — every task:
    - Atomic scope (1-3 files in the `**Files**` field)

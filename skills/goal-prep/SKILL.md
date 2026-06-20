@@ -252,6 +252,7 @@ When detected:
 - Set `intake.completion_proof` = "every task's `Done when:` proof passes (each PASS — none FAIL/UNKNOWN) and every `[must]` requirement is satisfied", reusing blueprint's **PASS / FAIL / UNKNOWN** vocabulary (`skills/blueprint/references/task-format.md`).
 - Capture one audit row per `### TASK-{N}` (Requirement = task title, Evidence = its `Done when:` command) — Phase 8.5 pre-fills the audit table from these.
 - Read the **tasks file** (`<spec-stem>/tasks.md`, or `<spec>.md`) for the proofs; if a sibling `reference.md` exists you may read it for non-goals/context, but completion comes from the tasks file's `Done when:` lines — never from the implementation the tasks point at.
+- If the tasks file has a **`## Needs your attention`** block, lift its blocking `❓ NEEDS YOU` items into `intake.existing_plan_facts` and append "resolve all `## Needs your attention` items before declaring done" to `completion_proof` — they are gating preconditions, not optional. Use the **`## Task index`** order (foundations-first) as the suggested execution order; do TASK-1's runnable/green baseline before anything that builds on it.
 
 This makes the charter's completion gate an objective projection of the plan, not hand-written prose. (Non-blueprint goals keep deriving `completion_proof` from intake as before.)
 

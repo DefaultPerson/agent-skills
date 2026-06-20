@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.0 — 2026-06-20
+
+`/blueprint` output is easier to navigate. Everything that needs a human now lives
+in **one** place — a `## Needs your attention` block at the top of the tasks file
+(blocking `❓ NEEDS YOU` forks, each wired `→ blocks: TASK-n`, plus the HITL tasks);
+the reference keeps only ranked **non-blocking** `## Assumptions`, so nothing is
+duplicated across the two files. A new **`## Task index`** checklist gives an
+at-a-glance, trackable map of every task (and is where blocked-on / HITL flags now
+live, instead of scattered per-task `Status:` lines). A **foundations-first** rule
+stops plans from "starting in mid-air": the first task leaves the project
+runnable/green (greenfield skeleton + smoke test, or a brownfield baseline proof),
+the test harness lives there and is reused — never buried in a later task — and each
+area appears exactly once. Also fixes a latent bug: `verify-spec.py` didn't recognise
+the v0.7.0 directory form (`<spec-stem>/tasks.md` + `reference.md`) and falsely failed
+it; it now resolves the directory form and adds light checks for the new layout.
+
 ## 0.7.0 — 2026-06-20
 
 De-formalized `/blueprint`. Dropped the ADR machinery entirely (no more

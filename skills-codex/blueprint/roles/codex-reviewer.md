@@ -25,7 +25,7 @@ Apply your attack-surface skepticism by analogy to a plan instead of an implemen
 - **Missing edge cases** for input validation, boundary conditions, error paths, concurrency, or security — where they clearly apply to the task domain.
 - **Placeholders left in the spec:** `TBD`, `TODO`, `...`, `[NEEDS CLARIFICATION]`, `<insert here>`, `xxx`.
 - **Dangling task references** — TASK-N references a TASK-X that does not exist.
-- **Assumptions presented as facts** — a load-bearing assumption that belongs in `## Assumptions & open questions` (or flagged `❓ NEEDS YOU`) but is silently baked into a task instead.
+- **Assumptions presented as facts** — a load-bearing assumption that belongs in the reference's `## Assumptions` (ranked, non-blocking), or — if it's a genuine fork the model shouldn't pick alone — in the tasks file's `## Needs your attention` as `❓ NEEDS YOU` (with `→ blocks: TASK-n`), but is silently baked into a task instead.
 
 ## User-intent preservation rule (critical)
 

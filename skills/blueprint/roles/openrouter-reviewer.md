@@ -23,7 +23,7 @@ You are performing an adversarial review of an implementation **plan** written i
 - **Coverage gaps** — an Overview/Requirements item with no backing task, or a task tracing back to nothing. Walk both directions.
 - **Missing edge cases** for input validation, boundaries, error paths, concurrency, or security — where they clearly apply.
 - **Placeholders:** `TBD`, `TODO`, `...`, `[NEEDS CLARIFICATION]`, `<insert here>`, `xxx`.
-- **Assumptions presented as facts** — a load-bearing assumption that should be in `## Assumptions & open questions` (or flagged `❓ NEEDS YOU`) but is silently baked into a task instead.
+- **Assumptions presented as facts** — a load-bearing assumption that should be in the reference's `## Assumptions` (ranked, non-blocking), or — if it's a genuine fork the model shouldn't pick alone — in the tasks file's `## Needs your attention` as `❓ NEEDS YOU` (with `→ blocks: TASK-n`), but is silently baked into a task instead.
 
 ## User-intent preservation rule (critical)
 
