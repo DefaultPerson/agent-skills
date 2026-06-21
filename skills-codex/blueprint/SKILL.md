@@ -212,7 +212,9 @@ print(matches[-1] if matches else json.dumps({"summary":"approve","findings":[]}
   PROMPT="$(cat roles/openrouter-reviewer.md)
 SPEC FILE ($SPEC_PATH):
 $(cat "$SPEC_PATH")"
-  resp="$(curl -sS --max-time 120 -w $'\n%{http_code}' \
+  # Reasoning reviewers (GLM/Kimi) on a long spec can take minutes — allow 300s
+  # (120s/180s timed out: "response never arrived"). Timeout → non-200 → graceful degrade.
+  resp="$(curl -sS --connect-timeout 20 --max-time 300 -w $'\n%{http_code}' \
     https://openrouter.ai/api/v1/chat/completions \
     -H "Authorization: Bearer $OPENROUTER_API_KEY" -H "Content-Type: application/json" \
     -H "X-Title: blueprint consensus" \

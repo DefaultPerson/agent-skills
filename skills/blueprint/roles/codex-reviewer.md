@@ -2,8 +2,10 @@
 
 This file IS the full prompt passed to the cross-model reviewer in Phase 7.6 of `/blueprint`. Two callers:
 
-1. **Claude variant** — `codex review --uncommitted "$(cat roles/codex-reviewer.md)"` — codex CLI receives this as the `[focus text]` argument and reviews the working-tree diff.
+1. **Claude variant** — `sed "s|<spec_path>|$spec_path|g" roles/codex-reviewer.md | codex exec -` — the prompt is piped on stdin and codex returns its raw output. Use `codex exec`, NOT `codex review`: `codex review --uncommitted` conflicts with any prompt, and plain `codex review` reformats output into its own summary so the JSON block is lost. codex reads the spec file from the working tree via its own tools.
 2. **Codex variant** — `claude -p - < roles/codex-reviewer.md` (with `<spec_path>` substituted) — claude CLI receives this as stdin and reads the spec file from disk.
+
+Both callers substitute `<spec_path>` and read the spec **from disk** — there is no implicit diff in context.
 
 The orchestrator does NOT wrap or template the body. Keep everything between `BEGIN_PROMPT` and `END_PROMPT` self-contained — the receiving CLI sees no other context from us.
 
@@ -11,7 +13,7 @@ The orchestrator does NOT wrap or template the body. Keep everything between `BE
 
 BEGIN_PROMPT
 
-You are performing an adversarial review of an enriched markdown **plan** (NOT executable code). Read the spec file at `<spec_path>` from disk (if you have file access — claude path) or work from the working-tree diff already in your context (if you're a `codex review --uncommitted` invocation). The enrichment is the change under review: original notes were turned into atomic tasks with shell-verifiable `Done when:` proofs, plain-language requirements, edge cases, and risk surface.
+You are performing an adversarial review of an enriched markdown **plan** (NOT executable code). **Read the spec file at `<spec_path>` from disk** (it is in the working tree). The enrichment is the change under review: original notes were turned into atomic tasks with shell-verifiable `Done when:` proofs, plain-language requirements, edge cases, and risk surface.
 
 Apply your attack-surface skepticism by analogy to a plan instead of an implementation. **Assume the author was careless** — verify *instrumentally* (trace coverage both ways, hunt counter-examples, check internal consistency), not by re-reading and nodding. The goal is to break confidence in the plan, not to validate it. Surface what an unmotivated downstream builder would stumble on, contradict, or interpret two different ways.
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.10.0 — 2026-06-21
+
+Fixed `/blueprint`'s Phase 7.6 Codex reviewer, which was silently no-op'ing. On
+codex 0.137 `codex review --uncommitted` rejects any prompt argument (clap
+conflict), so the adversarial prompt was being dropped and a default review ran;
+and `codex review` reformats output into its own summary, so the JSON findings
+block never appeared and extraction always fell back to an empty "approve" — the
+consensus loop wasn't really getting Codex's review. Now the Claude-host reviewer
+runs `codex exec -` (prompt on stdin, `<spec_path>` substituted, raw
+prompt-controlled JSON output) — verified end-to-end. Also bumped the OpenRouter
+third-reviewer timeout 120s → 300s (reasoning models on a long spec were timing
+out, "response never arrived") with a 20s connect-timeout; a timeout still
+degrades gracefully to the remaining reviewers.
+
 ## 0.9.0 — 2026-06-21
 
 `/blueprint` plans are split for tracking. `tasks.md` is now a lean **checklist**

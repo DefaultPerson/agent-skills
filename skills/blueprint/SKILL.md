@@ -45,7 +45,7 @@ Turn a clean spec into a readable, implementation-ready **plan**: atomic vertica
 - **Slow and thorough — overkill for hour-long tasks.** Decomposition + Done-when proofs + edge cases + 3 consensus rounds (if codex is available) take 10-15 minutes. For smaller tasks, write the plan by hand.
 - **Does not work on raw chat exports or unstructured notes.** The input spec must already be sectioned with `## ` (after `/cleanup`). Otherwise — abort.
 - **Not suited for product-style PRDs.** This skill forces a `Done when:` shell proof per task; for product-management PRDs use `mattpocock:to-prd` (freeform success metrics).
-- **Phase 7.6 consensus loop needs at least one external reviewer.** Best signal comes from the `codex` CLI on `$PATH` (npm `@openai/codex`), invoked as `codex review --uncommitted "<prompt>"`. Optionally a third model via OpenRouter (`OPENROUTER_API_KEY`). With **neither** available — fallback to internal validation (a single model reviewing its own output, weaker).
+- **Phase 7.6 consensus loop needs at least one external reviewer.** Best signal comes from the `codex` CLI on `$PATH` (npm `@openai/codex`), invoked as `codex exec -` with the prompt on stdin (NOT `codex review`, whose `--uncommitted` conflicts with a prompt and whose default output isn't JSON). Optionally a third model via OpenRouter (`OPENROUTER_API_KEY`). With **neither** available — fallback to internal validation (a single model reviewing its own output, weaker).
 - **Not for autonomous orchestration.** The output has no `[P]` markers, Stages, or dependency graphs — the execute pipeline was removed from this repo in v2.0. Output is for `mattpocock:tdd` or manual work.
 
 ## How to do it wrong vs right
@@ -201,7 +201,7 @@ The reference is the plan's body now, so keep it **tight and non-redundant**: st
 Step 2 (questioner pattern) and the Phase 7.6 consensus loop (with fallback validator) — templates live in `roles/`:
 
 - `roles/questioner.md` — format contract for AskUserQuestion in step 2 (not a subagent — a format spec). Includes the multi-angle challenge.
-- `roles/codex-reviewer.md` — **full prompt** passed verbatim to `codex review --uncommitted` (Claude host) or `claude -p` (Codex host). Owns the adversarial role, substance criteria, user-intent preservation rule, and JSON output schema. Standalone — no template wrapping.
+- `roles/codex-reviewer.md` — **full prompt** (with `<spec_path>` substituted) piped to `codex exec -` (Claude host) or `claude -p -` (Codex host). Owns the adversarial role, substance criteria, user-intent preservation rule, and JSON output schema. Standalone — no template wrapping.
 - `roles/openrouter-reviewer.md` — **full prompt** for the optional third reviewer (a diverse frontier model via OpenRouter). Same adversarial role + JSON schema; reviews the spec content passed in the request body.
 - `roles/claude-self-assessor.md` — Phase 7.6 Claude self-assessment in a fresh subprocess (`claude -p`), categorizes the union of reviewer findings as ACCEPT / REJECT_PETTY / NEEDS_USER.
 - `roles/spec-validator.md` — fallback used inside Phase 7.6 when NO external reviewer is available.
@@ -216,11 +216,19 @@ Substitutions:
 | `{codex_prompt}` | full text content of `roles/codex-reviewer.md` (entire file, passed as the review prompt) |
 
 Invocations:
-- **Codex adversarial review:** call `codex review --uncommitted` directly via Bash. Stable public dependency (`npm install -g @openai/codex`); no `codex-plugin-cc` runtime.
+- **Codex adversarial review:** call `codex exec` directly via Bash. Stable public dependency (`npm install -g @openai/codex`); no `codex-plugin-cc` runtime.
   ```bash
   command -v codex >/dev/null 2>&1 || { echo "codex CLI not installed"; exit 1; }
-  PROMPT="$(cat skills/blueprint/roles/codex-reviewer.md)"
-  OUTPUT="$(codex review --uncommitted "$PROMPT")"
+  # Use `codex exec -` (NOT `codex review`). Two traps proven empirically on codex 0.137:
+  #   1. `codex review --uncommitted` CONFLICTS with any [PROMPT] (clap rejects the combo) — so
+  #      our prompt got dropped and codex ran a DEFAULT review.
+  #   2. `codex review` reformats output into its own review summary ("No actionable defects…"),
+  #      so our `\`\`\`json\`\`\`` block never appears and extraction always falls back to empty approve.
+  # `codex exec -` runs our prompt verbatim and returns the model's RAW output (prompt-controlled
+  # JSON), and the model reads the spec via its own shell/file tools. Feed the prompt on stdin
+  # (`-`) with <spec_path> substituted; the prompt tells codex to read that file from the tree.
+  PROMPT="$(sed "s|<spec_path>|$spec_path|g" skills/blueprint/roles/codex-reviewer.md)"
+  OUTPUT="$(printf '%s' "$PROMPT" | codex exec -)"
   # Extract the last fenced JSON code block — the prompt instructs the model to emit findings there.
   FINDINGS="$(printf '%s' "$OUTPUT" | python3 -c '
 import sys, re, json
@@ -238,7 +246,9 @@ print(matches[-1] if matches else json.dumps({"summary":"approve","findings":[]}
   PROMPT="$(cat skills/blueprint/roles/openrouter-reviewer.md)
 SPEC FILE ($spec_path):
 $(cat "$spec_path")"
-  resp="$(curl -sS --max-time 120 -w $'\n%{http_code}' \
+  # Reasoning reviewers (GLM/Kimi) on a long spec can take minutes — allow 300s
+  # (120s/180s timed out: "response never arrived"). Timeout → non-200 → graceful degrade below.
+  resp="$(curl -sS --connect-timeout 20 --max-time 300 -w $'\n%{http_code}' \
     https://openrouter.ai/api/v1/chat/completions \
     -H "Authorization: Bearer $OPENROUTER_API_KEY" -H "Content-Type: application/json" \
     -H "X-Title: blueprint consensus" \
@@ -300,7 +310,7 @@ After steps 6-7 (write plan + verify-spec.py mechanical check), the convergence 
 
 Each round, every **available** external reviewer produces findings independently; Claude (in a fresh `claude -p` subprocess) triages the **union**. Independent finders, one triager. Reviewers:
 
-- **Codex** — `codex review --uncommitted` (if `codex` on `$PATH`). Prompt: `roles/codex-reviewer.md`.
+- **Codex** — `codex exec -` (prompt on stdin; if `codex` on `$PATH`). Prompt: `roles/codex-reviewer.md`.
 - **OpenRouter third reviewer** — a diverse frontier model (default `z-ai/glm-5.2`) via the chat API (if `OPENROUTER_API_KEY` is set). Prompt: `roles/openrouter-reviewer.md`.
 - If **neither** is available → single-model fallback (`roles/spec-validator.md`).
 
@@ -318,8 +328,8 @@ if reviewers is empty:
                  prompt=substitute("roles/spec-validator.md", {spec_path, spec_path_bak}))
   → CONSENSUS or NEEDS_FIX (single round only); goto Step 9
 
-# Spec is in the working tree, NOT committed. `codex review --uncommitted`
-# reads staged/unstaged/untracked; the OpenRouter call reads the file content.
+# Spec is in the working tree. `codex exec` reads <spec_path> via its own file tools
+# (the prompt tells it to); the OpenRouter call reads the file content inline.
 
 rounds = []
 while round < MAX_ROUNDS:
@@ -330,7 +340,7 @@ while round < MAX_ROUNDS:
   #    non-200) degrades to an empty approve for THIS round, logged — never aborts.
   all_findings = []
   for r in reviewers:
-    all_findings += run_reviewer(r)   # codex review --uncommitted  |  OpenRouter curl
+    all_findings += run_reviewer(r)   # codex exec -  |  OpenRouter curl
 
   # 2. Claude self-assessment over the UNION (fresh subprocess)
   assessment = bash: claude -p < (
@@ -367,7 +377,7 @@ if round == MAX_ROUNDS and not CONSENSUS:
 
 Failure modes:
 - **No external reviewer** (`codex` not on `$PATH` AND no `OPENROUTER_API_KEY`) → single-model `roles/spec-validator.md`, continues with a warning.
-- **Spec not in a git repository** → `codex review --uncommitted` needs git; if outside a repo, drop Codex (OpenRouter still works — it reads the file). If that leaves no reviewer, fall back to spec-validator.
+- **Codex unavailable / errors** (not installed, or `codex exec` fails) → drop Codex for that round (OpenRouter still works — it reads the file inline). If that leaves no reviewer, fall back to spec-validator.
 - **OpenRouter unavailable** (missing/invalid key → 401, no credits → 402, rate-limit → 429, provider down → 5xx) → drop the third reviewer for that round, log the HTTP code, continue with whoever's left. Pin the exact model slug so a future GLM/Kimi version doesn't silently change the reviewer.
 - **A reviewer's response has no JSON block** → extractor returns `{"summary":"approve","findings":[]}` (logged, no-op). Persistent across rounds → escalate.
 - **Models gang up on user intent** → `roles/codex-reviewer.md` / `roles/openrouter-reviewer.md` forbid proposing removal of unusual requirements; `roles/claude-self-assessor.md` mirrors the rule when categorizing.
@@ -402,7 +412,7 @@ Phase 7.6 internals (per-round findings, applied/rejected/escalated breakdown, p
 - **Output (on disk):** the plan directory `<spec-stem>/` (`tasks.md` + `reference.md`), or `<spec>.md` for a trivial single-file spec; the original is backed up to `<spec>.bak`, kept until step 10.
 - **Output (optional, in tracker):** Step 10 offers a literal "type `/to-prd` next" instruction if `mattpocock:to-prd` is installed.
 - **Downstream builders:** `mattpocock:tdd` (RED-GREEN-REFACTOR), Claude Code goal feature (autonomous), or manual implementation.
-- **Cross-model dependency:** Phase 7.6 uses `codex review --uncommitted` ([codex CLI](https://github.com/openai/codex)) and/or a diverse OpenRouter model (`OPENROUTER_API_KEY`). Without either — graceful fallback to `roles/spec-validator.md`.
+- **Cross-model dependency:** Phase 7.6 uses `codex exec -` ([codex CLI](https://github.com/openai/codex)) and/or a diverse OpenRouter model (`OPENROUTER_API_KEY`). Without either — graceful fallback to `roles/spec-validator.md`.
 
 ## Rules
 
