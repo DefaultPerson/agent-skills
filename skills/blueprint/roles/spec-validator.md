@@ -12,12 +12,10 @@ If any external reviewer is available (Codex via `roles/codex-reviewer.md`, or a
 ## What to check
 
 1. **Template compliance** — required sections present:
-   - Overview (with original content from `.bak`)
-   - Requirements (if multi-component) and any Non-goals
-   - Tasks (each with a `Done when:` shell proof), preceded by a `## Task index` checklist
-   - `## Needs your attention` in the tasks file IF any blocking `❓ NEEDS YOU` / HITL items exist (each blocker `→ blocks: TASK-n`); these must NOT be duplicated in the reference
-   - `## Assumptions` (ranked, non-blocking) in the reference
-   - Risks
+   - tasks.md: `## Tasks` is a **checklist** (one `- [ ] TASK-n — title` per task, grouped by area once); `## Needs your attention` IF any blocking `❓ NEEDS YOU` / HITL items exist (each blocker `→ blocks: TASK-n`), and these must NOT be duplicated in the reference
+   - reference.md: Overview (with original content from `.bak`), Requirements (if multi-component) and any Non-goals, `## Assumptions` (ranked, non-blocking), Risks, and **`## Task details`** — the full `### TASK-n` blocks (each with `**Files**` + a `Done when:` shell proof)
+   - Every checklist `TASK-n` ↔ exactly one `### TASK-n` detail block
+   - reference is concise + DRY (each fact once, no cross-section duplication) — yet lossless
 2. **Task quality** — every task:
    - Atomic scope (1-3 files in the `**Files**` field)
    - Concrete title (NOT "Implement authentication system")

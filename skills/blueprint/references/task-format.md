@@ -4,20 +4,22 @@ In step 3, blueprint decomposes the spec into tasks. The format adapts to the sp
 
 > **Readable, not ceremonial.** Write tasks like a plan a teammate can act on, not a compliance document. The rigor lives in the `Done when:` shell proof — not in scaffolding words. No `AC-N.N` numbering, no `Given/When/Then` boilerplate, no `Proof:` label. One plain sentence + one command.
 
-## Output: a plan directory (tasks + reference)
+## Output: a checklist (tasks.md) + a reference body (reference.md)
 
-blueprint writes the plan as **two** files (step 6), for context economy — executors / per-stage sub-agents / `/verify-done` / goal-prep load only the lean tasks file. **More than one file ⇒ a flat directory `<spec-stem>/`** (no nested subdirs); a trivial spec stays a single `<spec>.md`:
+blueprint writes the plan as **two** files (step 6). **More than one file ⇒ a flat directory `<spec-stem>/`** (no nested subdirs); a trivial spec stays a single `<spec>.md`:
 
-- **`<spec-stem>/tasks.md` — tasks file (PRIMARY).** In order: a `> Context: see reference.md` pointer line; **`## Needs your attention`** (only if it has content); **`## Task index`** (a checklist of every task); then **`## Tasks`** (the full blocks). Each task is **self-sufficient** — executable from this file alone (`Done when:` IS the acceptance). This is the downstream contract. (See "The navigation layer" below.)
-- **`<spec-stem>/reference.md` — reference:** `## Overview`, full `## Requirements`, Terminology, **`## Assumptions`** (ranked, non-blocking only), `## Risks`, `## Non-goals`. Read-once "why". Blocking `❓ NEEDS YOU` items do NOT live here — they live in tasks.md `## Needs your attention`.
+- **`<spec-stem>/tasks.md` — the at-a-glance tracker.** In order: a `> Task detail + context: see reference.md` pointer line; **`## Needs your attention`** (only if it has content); then **`## Tasks`** — a **checklist**, one `- [ ] TASK-n — short title` line per task. NO `### TASK-n` blocks here. (See "The navigation layer" below.)
+- **`<spec-stem>/reference.md` — the plan body + context.** `## Overview`, full `## Requirements`, Terminology, **`## Assumptions`** (ranked, non-blocking only), `## Risks`, `## Non-goals`, and **`## Task details`** — the full `### TASK-n` blocks (`**Files**`, `**Leverage**`, `Done when:` proof, inline `Edge:`), grouped by `▸ AREA-n` mirroring the checklist. Blocking `❓ NEEDS YOU` do NOT live here. **`Done when:` (the acceptance contract) and the `### TASK-n` anchors live here — `/verify-done` and goal-prep read the proofs from `## Task details`.**
 
-Downstream readers resolve the tasks file as `<spec-stem>/tasks.md` (directory form) or `<spec>.md` (single-file fallback).
+Single-file fallback: a trivial `<spec>.md` holds `## Overview`, the `## Tasks` checklist, and `## Task details` in one file. Downstream readers resolve the checklist as `<spec-stem>/tasks.md` (or `<spec>.md`) and the `### TASK-n` proofs in `<spec-stem>/reference.md` `## Task details` (or the single file's `## Task details`). A task cites a requirement by light id (`R1`) only when it genuinely depends on one.
 
-A task cites a requirement by light id (`R1`) only when it genuinely depends on one — don't add IDs for their own sake. Trivial / single-component specs may stay a single `<spec>.md` (reference sections folded in); otherwise the plan is a flat `<spec-stem>/` directory. Downstream resolves the tasks file as `<spec-stem>/tasks.md` (directory form) or `<spec>.md` (single file).
+### Keep reference.md concise + DRY — lossless
 
-## The navigation layer (`## Needs your attention` + `## Task index`)
+The reference is the plan body, so keep it tight: each fact in exactly ONE section, cross-reference instead of repeating; cut filler and merge near-duplicate prose/risks — but **never drop a fact** (every requirement, decision, assumption, risk, edge, code-pointer survives somewhere). Per-task specifics (paths, proofs, edges) live ONLY in that task's `### TASK-n` block, never also in a context table. Structured facts → a table, one row each. Lossless check: every distinct fact from the pre-edit reference + `<spec>.bak` is still findable.
 
-A thin, scannable layer sits above the full task blocks so a reader never has to hunt across files or scan every block to see what needs them and what's left to do. It is a **projection** of the task blocks (the blocks stay the single source of truth); keep the two in sync.
+## The navigation layer (`## Needs your attention` + the `## Tasks` checklist)
+
+tasks.md is a thin, scannable tracker over the detail blocks in `reference.md` `## Task details` (the blocks stay the single source of truth for *how*). Keep checklist and blocks in sync — one `- [ ] TASK-n` per `### TASK-n`.
 
 ### `## Needs your attention` (omit the heading on a clean plan)
 
@@ -34,10 +36,10 @@ The ONE place for anything that needs the reader. Two kinds of line:
 - **Blocking forks** — `❓ NEEDS YOU` with a light tag (`[decision]` / `[question]` / `[unknown]`), ending in **`→ blocks: TASK-n[, TASK-m]`** (or `→ blocks: all`). Every blocking item the model can't decide alone goes here — and ONLY here (not also in reference.md).
 - **HITL tasks** — `HITL: TASK-n — title (why)`, one per task carrying `**Mode**: HITL`, so the reader sees up front what they can't delegate.
 
-### `## Task index` (the at-a-glance map + tracker)
+### `## Tasks` — the checklist (the at-a-glance map + tracker)
 
 ```markdown
-## Task index
+## Tasks
 
 **▸ AREA-1 — Realtime**
 - [ ] TASK-1 — push instant-ness spike  · HITL · ❓
@@ -49,9 +51,13 @@ The ONE place for anything that needs the reader. Two kinds of line:
 ```
 
 - One line per task: **`- [ ] TASK-n — short title`** (≤ ~6 words). GFM checkbox = progress tracking.
-- **Bare `TASK-n`, never `### TASK-n`** — a `###` here double-counts in `verify-spec.py` and `goal-prep`.
-- Grouped under the same `**▸ AREA-n**` / `**US-n**` headers as `## Tasks`, **each group exactly once**, foundations-first.
+- **Bare `TASK-n`, never `### TASK-n`** — the `### TASK-n` blocks live in `reference.md` `## Task details`.
+- Grouped under `**▸ AREA-n**` / `**US-n**` headers, **each group exactly once**, foundations-first.
 - Light flags only: `· after TASK-x` (real prerequisite), `· HITL`, `· ❓` (gated by a `## Needs your attention` item). No graph, no `[P]`, no Stages.
+
+## Task detail blocks (live under `## Task details` in reference.md)
+
+The `### TASK-{N}` blocks below are the **detail**, written under `## Task details` in `reference.md` (or the single-file's `## Task details`), one per checklist line, grouped by the same `▸ AREA-n` / `US-n` order. The format adapts to spec type — product / technical / small.
 
 ## Product spec format
 
@@ -103,7 +109,7 @@ Done when: `{command}` — {what passing looks like}.
 - **`Done when:`** — one plain sentence ending in a runnable shell/test command in backticks. It must return **PASS / FAIL / UNKNOWN** (UNKNOWN when the env isn't up — e.g. server not running), never a vague "it works". This replaces the old `AC` / `Given/When/Then` / `Proof:` block.
 - **`**Files**`** — exact paths, not "auth module", not "user-related files".
 - **`**Leverage**`** — required. Forces a look for reusable code before writing from scratch. "none" is fine if genuinely from scratch.
-- **`**Status**`** (optional) — execution state only: `todo` / `done` / `failed`; absence implies `todo`. The index `- [ ]`/`- [x]` checkbox is the usual tracker. Do NOT scatter `blocked-on-TASK-x` lines across blocks — a real prerequisite is the index's `· after TASK-x`, and a human-gated blocker is a `## Needs your attention` item (`→ blocks: TASK-n`).
+- **`**Status**`** (optional) — execution state only: `todo` / `done` / `failed`; absence implies `todo`. The checklist `- [ ]`/`- [x]` box in tasks.md is the usual tracker. Do NOT scatter `blocked-on-TASK-x` lines across blocks — a real prerequisite is the checklist's `· after TASK-x`, and a human-gated blocker is a `## Needs your attention` item (`→ blocks: TASK-n`).
 - **`**Mode**`** (optional) — add `HITL` only when the task needs human judgment (architecture call, design review, external access, manual verification). Absence implies an autonomous agent can close it. Every HITL task is also aggregated once in `## Needs your attention`.
 
 ## Behaviour, not procedure
@@ -136,7 +142,7 @@ The first task must leave the project **runnable and verifiable**, so every late
 
 **No buried scaffold.** The test harness, fixtures, and CI entrypoint live in that first task; later tasks reuse them via `**Leverage**: <foundation task> harness`. A feature task must NOT create the test runner as a side effect — if scaffolding is missing, it belongs earlier. The first *feature* task's `Done when:` must run assuming only the foundation has landed.
 
-**Order, don't graph.** Group by area; each area appears exactly once; order tasks (and areas) so a genuine prerequisite sits above what needs it. The only sequencing artifacts are this ordering + the index's inline `· after TASK-x`. No Stages, `[P]`, or dependency graph.
+**Order, don't graph.** Group by area; each area appears exactly once; order tasks (and areas) so a genuine prerequisite sits above what needs it. The only sequencing artifacts are this ordering + the checklist's inline `· after TASK-x`. No Stages, `[P]`, or dependency graph.
 
 ## Edge cases — which categories to include
 
@@ -152,7 +158,7 @@ Relevance depends on the task. User model — Input + Boundaries + Security. Log
 
 ## What is NOT in blueprint output
 
-- ❌ `[P]` parallel markers, `Stages`, `## Execution Order`, a dependency graph / edge list (`TASK-a -> TASK-b`, a `## Dependencies` section) — the execute orchestration was removed in v2.0. Sequencing is area order + the index's inline `· after TASK-x` only. If you see the rest, it's a bug.
+- ❌ `[P]` parallel markers, `Stages`, `## Execution Order`, a dependency graph / edge list (`TASK-a -> TASK-b`, a `## Dependencies` section) — the execute orchestration was removed in v2.0. Sequencing is area order + the checklist's inline `· after TASK-x` only. If you see the rest, it's a bug.
 - ❌ `AC-N.N` numbering, `Given:/When:/Then:` scaffolding, `Proof:` labels — replaced by the single `Done when:` line.
 - ❌ RFC-2119 `MUST/SHOULD/MAY` prose in tasks — priority lives in `## Requirements` tags (`[must]/[nice]/[later]`), see `references/contracts.md`.
 - ❌ A plan that starts in mid-air — a first task that is a blocked spike with no green baseline before it; or the test runner / CI set up as a side effect of a feature task (buried scaffold). Foundations come first.

@@ -1,200 +1,246 @@
 #!/usr/bin/env python3
-"""Verify a blueprint spec: required sections, every task has Files + a `Done when:`
-shell proof, no unresolved markers, and no leftover old-pipeline ceremony.
+"""Verify a blueprint plan.
 
-FAIL (exit 1) on structural problems. WARN (still exit 0) on style regressions
-toward the old RFC-2119 / AC-N.N / Given-When-Then format the skill moved away from.
+Layout (v0.9.0): the plan is split for at-a-glance tracking —
+  tasks.md     — `## Needs your attention` (if any) + `## Tasks` CHECKLIST
+                 (one `- [ ] TASK-n — title` line per task, grouped by area).
+  reference.md — `## Overview` … `## Task details` with the full `### TASK-n`
+                 blocks (**Files**, `Done when:` shell proof, `Edge:`). The
+                 `Done when:` proofs and `### TASK-n` anchors live HERE now.
+A trivial spec may be a single `<spec>.md` holding both `## Tasks` and
+`## Task details`.
+
+FAIL (exit 1) on structural problems (missing sections/proofs, dangling refs,
+old layout). WARN (still exit 0) on drift + style regressions toward the old
+RFC-2119 / AC-N.N / Given-When-Then ceremony the skill moved away from.
 """
 import sys
 import re
 import os
 
 
-def main():
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <spec-file>")
-        sys.exit(2)
+TASK_HDR = re.compile(r'^### TASK-(\d+)')
+CHECK_ROW = re.compile(r'\s*[-*]\s*\[[ xX]\]\s*\*{0,2}TASK-(\d+)')
+GROUP_HDR = re.compile(r'▸\s*((?:AREA|US)-\d+)')
 
-    spec_path = sys.argv[1]
-    with open(spec_path) as f:
-        content = f.read()
-        lines = content.splitlines()
 
-    errors = []
-    warnings = []
+def task_blocks(text):
+    """Return [(num, block_text, line_no)] for each `### TASK-n` block in text."""
+    lines = text.splitlines()
+    starts = [(i, m.group(1)) for i, ln in enumerate(lines) if (m := TASK_HDR.match(ln))]
+    out = []
+    for idx, (ln, num) in enumerate(starts):
+        end = starts[idx + 1][0] if idx + 1 < len(starts) else len(lines)
+        out.append((num, "\n".join(lines[ln:end]), ln + 1))
+    return out
 
-    # Plan layout, in resolution order:
-    #   directory form (v0.7.0 default): <spec-stem>/tasks.md + <spec-stem>/reference.md
-    #   legacy sibling form:             <base>.md      + <base>.reference.md
-    #   single-file:                     <spec>.md      (reference sections folded in)
-    base = spec_path[:-3] if spec_path.endswith(".md") else spec_path
-    spec_dir = os.path.dirname(spec_path)
-    spec_name = os.path.basename(spec_path)
 
-    # If handed the reference file directly, validate it as context-only and stop.
-    if spec_name == "reference.md" or spec_path.endswith(".reference.md"):
-        if "## Overview" not in content:
-            print("FAIL: reference file missing ## Overview")
-            sys.exit(1)
-        print("PASS: reference file (context) looks well-formed")
-        sys.exit(0)
+def section_group_dupes(text, section):
+    """Area/US group headers appearing >1× within a `## <section>` block."""
+    in_sec, seen = False, {}
+    for ln in text.splitlines():
+        if ln.startswith("## " + section):
+            in_sec = True
+            continue
+        if in_sec and ln.startswith("## ") and not ln.startswith("## " + section):
+            in_sec = False
+        if in_sec and (m := GROUP_HDR.search(ln)):
+            seen[m.group(1)] = seen.get(m.group(1), 0) + 1
+    return {k: n for k, n in seen.items() if n > 1}
 
-    ref_candidates = []
-    if spec_name == "tasks.md":                       # directory form
-        ref_candidates.append(os.path.join(spec_dir, "reference.md"))
-    ref_candidates.append(base + ".reference.md")     # legacy sibling form
-    ref_path = next((p for p in ref_candidates if os.path.exists(p)), ref_candidates[0])
-    two_file = os.path.exists(ref_path)
 
-    ref_content = ""
-    if two_file:
-        with open(ref_path) as rf:
-            ref_content = rf.read()
+def checklist_nums(text):
+    """TASK numbers from `- [ ] TASK-n` rows within the `## Tasks` section."""
+    in_tasks, nums = False, set()
+    for ln in text.splitlines():
+        if ln.startswith("## Tasks"):
+            in_tasks = True
+            continue
+        if in_tasks and ln.startswith("## ") and not ln.startswith("## Tasks"):
+            in_tasks = False
+        if in_tasks and (m := CHECK_ROW.match(ln)):
+            nums.add(m.group(1))
+    return nums
 
-    # --- Required sections (structural) ---
-    #   two-file mode: Overview/Requirements live in the reference → require only ## Tasks here
-    #   single-file mode: require both
-    required = ["## Tasks"] if two_file else ["## Overview", "## Tasks"]
-    for section in required:
-        if section not in content:
-            errors.append(f"Missing required section: {section}")
-    if two_file and "## Overview" not in ref_content:
-        errors.append(f"reference file {os.path.basename(ref_path)} missing ## Overview")
 
-    # Product specs (user stories or a Requirements section) — recommend linkage
-    is_product = bool(re.search(r'^## User Stories', content, re.MULTILINE))
-    has_requirements = "## Requirements" in content or "## Contracts" in content
-
-    # --- No unresolved clarification markers (structural) ---
-    for i, line in enumerate(lines, 1):
-        for marker in ("[NEEDS CLARIFICATION]", "TBD", "<insert here>"):
-            if marker in line:
-                errors.append(f"Line {i}: unresolved placeholder {marker!r}: {line.strip()[:80]}")
-
-    # --- Dead old-pipeline constructs (structural — execute orchestration is gone) ---
-    if "## Execution Order" in content:
-        errors.append("Dead section '## Execution Order' present (execute pipeline removed in v2.0)")
-    for i, line in enumerate(lines, 1):
-        if re.search(r'\[P\]', line):
-            errors.append(f"Line {i}: stray [P] parallel marker (execute pipeline removed)")
-
-    # --- Tasks: each block needs **Files** and a `Done when:` with a shell command ---
-    task_pattern = re.compile(r'^### TASK-(\d+)')
-    task_starts = [(i, m.group(0)) for i, line in enumerate(lines)
-                   if (m := task_pattern.match(line))]
-
-    if not task_starts:
-        errors.append("No '### TASK-{N}' blocks found")
-
-    for idx, (start_line, task_id) in enumerate(task_starts):
-        end_line = task_starts[idx + 1][0] if idx + 1 < len(task_starts) else len(lines)
-        block = "\n".join(lines[start_line:end_line])
-
+def check_detail_blocks(blocks, label, errors, warnings, is_product):
+    for num, block, line in blocks:
+        tid = f"TASK-{num}"
         if "**Files**:" not in block and "**Files:**" not in block:
-            errors.append(f"{task_id} (line {start_line + 1}): missing **Files:** field")
-
-        # The proof: a `Done when:` line containing a backticked command.
-        done_when = re.search(r'Done when:.*`[^`]+`', block, re.IGNORECASE | re.DOTALL)
-        if not done_when:
-            errors.append(f"{task_id} (line {start_line + 1}): missing a `Done when:` line with a "
+            errors.append(f"{tid} ({label} line {line}): missing **Files:** field")
+        if not re.search(r'Done when:.*`[^`]+`', block, re.IGNORECASE | re.DOTALL):
+            errors.append(f"{tid} ({label} line {line}): missing a `Done when:` line with a "
                           "backticked shell command")
-
         if is_product and "**Covers**:" not in block and "**Covers:**" not in block:
-            warnings.append(f"{task_id} (line {start_line + 1}): product task has no **Covers:** "
+            warnings.append(f"{tid} ({label} line {line}): product task has no **Covers:** "
                             "link to a requirement")
 
-    if is_product and not has_requirements:
-        warnings.append("Product spec has '## User Stories' but no '## Requirements' section")
 
-    # --- Navigation layer: `## Needs your attention` + `## Task index` (v0.8.0) ---
-    real_task_nums = {m.group(1) for _, tid in task_starts
-                      if (m := re.search(r'TASK-(\d+)', tid))}
+def placeholder_and_dead(files, scan, errors):
+    for fname, ftext in files:
+        for i, line in enumerate(ftext.splitlines(), 1):
+            for marker in ("[NEEDS CLARIFICATION]", "TBD", "<insert here>"):
+                if marker in line:
+                    errors.append(f"{fname} line {i}: unresolved placeholder {marker!r}: "
+                                  f"{line.strip()[:70]}")
+            if re.search(r'\[P\]', line):
+                errors.append(f"{fname} line {i}: stray [P] parallel marker (execute pipeline removed)")
+    if "## Execution Order" in scan:
+        errors.append("Dead section '## Execution Order' present (execute pipeline removed in v2.0)")
 
-    # Blocking `→ blocks: TASK-n` references must point at a real task (dangling = FAIL:
-    # a builder acting on a phantom blocker is a real defect). `→ blocks: all` is allowed.
-    if "## Needs your attention" in content:
-        for i, line in enumerate(lines, 1):
-            m = re.search(r'(?:→|->)\s*blocks:\s*(.+)', line, re.IGNORECASE)
-            if not m or re.search(r'\ball\b', m.group(1)):
-                continue
-            for num in re.findall(r'TASK-(\d+)', m.group(1)):
-                if num not in real_task_nums:
-                    errors.append(f"Line {i}: '## Needs your attention' blocks a non-existent TASK-{num}")
 
-    # Task index rows (`- [ ] TASK-n`) should resolve, and every block should be indexed (WARN — drift).
-    if "## Task index" in content:
-        index_nums, in_index = set(), False
-        index_row = re.compile(r'\s*[-*]\s*\[[ xX]\]\s*\*{0,2}TASK-(\d+)')
-        for i, line in enumerate(lines, 1):
-            if line.startswith("## Task index"):
-                in_index = True
-                continue
-            if in_index and line.startswith("## "):
-                in_index = False
-            if in_index and (m := index_row.match(line)):
-                index_nums.add(m.group(1))
-                if m.group(1) not in real_task_nums:
-                    warnings.append(f"Line {i}: task index lists TASK-{m.group(1)} with no '### TASK-{m.group(1)}' block")
-        for num in sorted(real_task_nums - index_nums, key=int):
-            warnings.append(f"TASK-{num} has a block but is missing from the '## Task index'")
-
-    # Each `▸ AREA-n` / `▸ US-n` group header should appear once within ## Tasks (WARN — split-area bug).
-    if "## Tasks" in content:
-        in_tasks, seen_groups = False, {}
-        group_re = re.compile(r'▸\s*((?:AREA|US)-\d+)')
-        for line in lines:
-            if line.startswith("## Tasks"):
-                in_tasks = True
-                continue
-            if in_tasks and line.startswith("## ") and not line.startswith("## Tasks"):
-                in_tasks = False
-            if in_tasks and (m := group_re.search(line)):
-                seen_groups[m.group(1)] = seen_groups.get(m.group(1), 0) + 1
-        for key, n in sorted(seen_groups.items()):
-            if n > 1:
-                warnings.append(f"group header '▸ {key}' appears {n}× within ## Tasks — each area/story "
-                                "group should appear exactly once (split-area bug)")
-
-    # One attention surface: blocking items must NOT be duplicated into the reference (WARN).
-    if two_file:
-        if re.search(r'❓\s*\*{0,2}\s*NEEDS YOU', ref_content):
-            warnings.append(f"{os.path.basename(ref_path)} carries a blocking '❓ NEEDS YOU' — move it to "
-                            "tasks.md '## Needs your attention' (one attention surface, no duplication)")
-        if "## Assumptions & open questions" in ref_content:
-            warnings.append(f"{os.path.basename(ref_path)} uses old heading '## Assumptions & open questions' "
-                            "— rename to '## Assumptions' (ranked, non-blocking only)")
-
-    # --- Style regressions toward the old ceremony (warn, don't fail) ---
+def style_warnings(files, warnings):
     style = [
-        (r'\bMUST\b|\bSHOULD\b|\bMAY\b', "RFC-2119 keyword (use [must]/[nice]/[later] tags)"),
+        (r'\bMUST\b|\bSHOULD\b|\bMAY\b', "RFC-2119 keyword (use [must]/[nice]/[later])"),
         (r'\bAC-\d', "AC-N.N numbering (use a plain `Done when:` line)"),
         (r'^\s*(Given|When|Then):', "Given/When/Then scaffolding (collapse into `Done when:`)"),
         (r'^\s*Proof:', "`Proof:` label (fold the command into `Done when:`)"),
-        (r'\bFR-\d{3}\b', "FR-NNN id (optional now — plain requirements + [tags] preferred)"),
+        (r'\bFR-\d{3}\b', "FR-NNN id (plain requirements + [tags] preferred)"),
     ]
-    for i, line in enumerate(lines, 1):
-        for pat, msg in style:
-            if re.search(pat, line):
-                warnings.append(f"Line {i}: old-format {msg}: {line.strip()[:70]}")
-                break
+    for fname, ftext in files:
+        for i, line in enumerate(ftext.splitlines(), 1):
+            for pat, msg in style:
+                if re.search(pat, line):
+                    warnings.append(f"{fname} line {i}: old-format {msg}: {line.strip()[:60]}")
+                    break
 
-    # --- Report ---
+
+def report(errors, warnings, ok_detail):
     if warnings:
         print(f"{len(warnings)} style warning(s) (non-blocking):")
         for w in warnings:
             print(f"  ~ {w}")
         print()
-
     if not errors:
-        mode = "product" if is_product else "technical/small"
-        print(f"PASS: {len(task_starts)} tasks verified, all have Files + a Done-when proof "
-              f"({mode} mode)")
+        print(f"PASS: {ok_detail}")
         sys.exit(0)
-
     print(f"FAIL: {len(errors)} issue(s) found:\n")
     for e in errors:
         print(f"  - {e}")
     sys.exit(1)
+
+
+def main():
+    if len(sys.argv) != 2:
+        print(f"Usage: {sys.argv[0]} <tasks-file | spec-file | reference-file>")
+        sys.exit(2)
+
+    spec_path = sys.argv[1]
+    with open(spec_path) as f:
+        content = f.read()
+
+    errors, warnings = [], []
+    spec_name = os.path.basename(spec_path)
+    spec_dir = os.path.dirname(spec_path)
+    base = spec_path[:-3] if spec_path.endswith(".md") else spec_path
+
+    # --- Handed the reference file directly → validate context + task-detail blocks, stop. ---
+    if spec_name == "reference.md" or spec_path.endswith(".reference.md"):
+        if "## Overview" not in content:
+            errors.append("reference file missing ## Overview")
+        is_product = "## User Stories" in content
+        blocks = task_blocks(content)
+        if "## Task details" in content and not blocks:
+            errors.append("reference has '## Task details' but no `### TASK-n` blocks")
+        check_detail_blocks(blocks, spec_name, errors, warnings, is_product)
+        for k, n in sorted(section_group_dupes(content, "Task details").items()):
+            warnings.append(f"group '▸ {k}' appears {n}× in ## Task details — each group once (split-area)")
+        placeholder_and_dead([(spec_name, content)], content, errors)
+        style_warnings([(spec_name, content)], warnings)
+        report(errors, warnings, f"reference file: {len(blocks)} task blocks, "
+                                 f"all with Files + a Done-when proof")
+
+    # --- Otherwise: the tasks file (checklist). Resolve the reference. ---
+    ref_candidates = []
+    if spec_name == "tasks.md":
+        ref_candidates.append(os.path.join(spec_dir, "reference.md"))   # directory form
+    ref_candidates.append(base + ".reference.md")                       # legacy sibling form
+    ref_path = next((p for p in ref_candidates if os.path.exists(p)), ref_candidates[0])
+    two_file = os.path.exists(ref_path)
+    ref_content = ""
+    if two_file:
+        with open(ref_path) as rf:
+            ref_content = rf.read()
+
+    detail = ref_content if two_file else content        # where the `### TASK-n` blocks live
+    detail_label = os.path.basename(ref_path) if two_file else spec_name
+    files = [(spec_name, content)] + ([(detail_label, ref_content)] if two_file else [])
+
+    # --- Old layout guard: `### TASK-n` blocks in the tasks file with no `## Task details`. ---
+    if task_blocks(content) and "## Task details" not in content:
+        errors.append("tasks file holds `### TASK-n` blocks directly — the current layout keeps a "
+                      "`- [ ] TASK-n` checklist in tasks.md and moves the full `### TASK-n` detail to "
+                      "reference.md `## Task details`. Migrate the plan (see blueprint).")
+        report(errors, warnings, "old layout")
+
+    # --- Required sections ---
+    if "## Tasks" not in content:
+        errors.append("tasks file missing required section: ## Tasks (the checklist)")
+    if two_file:
+        if "## Overview" not in ref_content:
+            errors.append(f"{detail_label} missing ## Overview")
+        if "## Task details" not in ref_content:
+            errors.append(f"{detail_label} missing ## Task details (the `### TASK-n` blocks)")
+    else:
+        for sec in ("## Overview", "## Task details"):
+            if sec not in content:
+                errors.append(f"single-file spec missing required section: {sec}")
+
+    is_product = "## User Stories" in content or "## User Stories" in detail
+    has_requirements = "## Requirements" in detail or "## Contracts" in detail
+
+    placeholder_and_dead(files, content + "\n" + ref_content, errors)
+
+    # --- Task detail blocks: Files + Done when ---
+    blocks = task_blocks(detail)
+    if not blocks:
+        errors.append(f"no `### TASK-n` blocks found in {detail_label} (expected under '## Task details')")
+    check_detail_blocks(blocks, detail_label, errors, warnings, is_product)
+    detail_nums = {num for num, _, _ in blocks}
+
+    # --- Checklist ↔ detail cross-checks ---
+    check_nums = checklist_nums(content)
+    if not check_nums:
+        errors.append("## Tasks has no `- [ ] TASK-n` checklist rows")
+    for num in sorted(check_nums - detail_nums, key=int):
+        errors.append(f"checklist TASK-{num} has no `### TASK-{num}` block in {detail_label} ## Task details")
+    for num in sorted(detail_nums - check_nums, key=int):
+        warnings.append(f"TASK-{num} has a detail block but is missing from the ## Tasks checklist")
+
+    # --- Needs your attention: `→ blocks: TASK-n` must resolve (dangling = FAIL) ---
+    if "## Needs your attention" in content:
+        for i, line in enumerate(content.splitlines(), 1):
+            m = re.search(r'(?:→|->)\s*blocks:\s*(.+)', line, re.IGNORECASE)
+            if not m or re.search(r'\ball\b', m.group(1)):
+                continue
+            for num in re.findall(r'TASK-(\d+)', m.group(1)):
+                if num not in check_nums and num not in detail_nums:
+                    errors.append(f"{spec_name} line {i}: '## Needs your attention' blocks a "
+                                  f"non-existent TASK-{num}")
+
+    # --- Split-area (each group once) in checklist and in details (WARN) ---
+    for txt, lbl, sec in [(content, spec_name, "Tasks"), (detail, detail_label, "Task details")]:
+        for k, n in sorted(section_group_dupes(txt, sec).items()):
+            warnings.append(f"group '▸ {k}' appears {n}× in {lbl} ## {sec} — each area/story "
+                            "group should appear exactly once (split-area bug)")
+
+    # --- One attention surface: no blocking duplication / old heading in reference (WARN) ---
+    if two_file:
+        if re.search(r'❓\s*\*{0,2}\s*NEEDS YOU', ref_content):
+            warnings.append(f"{detail_label} carries a blocking '❓ NEEDS YOU' — keep blockers only in "
+                            "tasks.md '## Needs your attention' (one attention surface)")
+        if "## Assumptions & open questions" in ref_content:
+            warnings.append(f"{detail_label} uses old heading '## Assumptions & open questions' — "
+                            "rename to '## Assumptions' (ranked, non-blocking only)")
+
+    if is_product and not has_requirements:
+        warnings.append("Product spec has '## User Stories' but no '## Requirements' section")
+
+    style_warnings(files, warnings)
+
+    mode = "product" if is_product else "technical/small"
+    report(errors, warnings, f"{len(blocks)} task blocks ({len(check_nums)} in checklist), {mode} mode "
+                             "— all blocks have Files + a Done-when proof")
 
 
 if __name__ == "__main__":

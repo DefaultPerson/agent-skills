@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.9.0 — 2026-06-21
+
+`/blueprint` plans are split for tracking. `tasks.md` is now a lean **checklist**
+— `## Needs your attention` (if any) + `## Tasks` with one `- [ ] TASK-n — title`
+line per task (grouped by area, foundations-first, light `· after`/`· HITL`/`· ❓`
+flags). The verbose per-task detail — `**Files**`, `**Leverage**`, the `Done when:`
+shell proof, `Edge:` cases — moves to `reference.md` under **`## Task details`**
+(the `### TASK-n` blocks). `Done when:` and the `### TASK-n` anchors live there now;
+`/verify-done` and `goal-prep` read the proofs from `## Task details`. New rule:
+the reference is kept **concise and DRY — lossless** (each fact in one section,
+cross-reference instead of repeating, merge duplicates — but never drop a fact).
+`verify-spec.py` reworked for the split: checklist ↔ detail-block cross-checks,
+dangling `→ blocks:` = FAIL, a clear "migrate" error on the old layout. Supersedes
+0.8.0's separate `## Task index` — the checklist *is* the task list.
+
 ## 0.8.0 — 2026-06-20
 
 `/blueprint` output is easier to navigate. Everything that needs a human now lives
