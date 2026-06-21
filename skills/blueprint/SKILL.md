@@ -6,18 +6,16 @@ description: >
   `Done when:` shell proof, plain-language requirements
   ([must]/[nice]/[later]), edge cases, ranked assumptions + open questions,
   and risks. Reads like a plan, not an RFC. Suitable for human
-  implementation, mattpocock:tdd, or Claude Code goal feature. Tradeoff:
-  slow and thorough — overkill for tasks under 1 hour. For freeform PRD use
-  mattpocock:to-prd instead. Triggers: "blueprint", "/blueprint", "plan
-  this spec", "составь план", "clarify", "/clarify", "уточни спеку",
-  "enrich spec", "decompose spec".
+  implementation or the Claude Code goal feature. Tradeoff:
+  slow and thorough — overkill for tasks under 1 hour. Triggers: "blueprint",
+  "/blueprint", "plan this spec", "составь план", "clarify", "/clarify",
+  "уточни спеку", "enrich spec", "decompose spec".
 when_to_use: >
   The input is a cleaned-up markdown spec/notes file (probably after
   /cleanup) that captures the WHAT but not the HOW. You want a readable plan
   of atomic tasks with shell-verifiable `Done when:` proofs before handing to
-  a builder (human, mattpocock:tdd, or goal feature). Do NOT use for raw chat
-  exports (run /cleanup first), for already-decomposed specs, or for
-  product-management-style PRDs (mattpocock:to-prd is better suited).
+  a builder (a human or the goal feature). Do NOT use for raw chat
+  exports (run /cleanup first) or for already-decomposed specs.
 allowed-tools: [Bash, Glob, Grep, Read, Edit, Write, Agent, AskUserQuestion]
 ---
 
@@ -44,9 +42,9 @@ Turn a clean spec into a readable, implementation-ready **plan**: atomic vertica
 
 - **Slow and thorough — overkill for hour-long tasks.** Decomposition + Done-when proofs + edge cases + 3 consensus rounds (if codex is available) take 10-15 minutes. For smaller tasks, write the plan by hand.
 - **Does not work on raw chat exports or unstructured notes.** The input spec must already be sectioned with `## ` (after `/cleanup`). Otherwise — abort.
-- **Not suited for product-style PRDs.** This skill forces a `Done when:` shell proof per task; for product-management PRDs use `mattpocock:to-prd` (freeform success metrics).
+- **Not suited for product-style PRDs.** This skill forces a `Done when:` shell proof per task; for freeform product-management PRDs (success metrics, not shell proofs) it's the wrong tool.
 - **Phase 7.6 consensus loop needs at least one external reviewer.** Best signal comes from the `codex` CLI on `$PATH` (npm `@openai/codex`), invoked as `codex exec -` with the prompt on stdin (NOT `codex review`, whose `--uncommitted` conflicts with a prompt and whose default output isn't JSON). Optionally a third model via OpenRouter (`OPENROUTER_API_KEY`). With **neither** available — fallback to internal validation (a single model reviewing its own output, weaker).
-- **Not for autonomous orchestration.** The output has no `[P]` markers, Stages, or dependency graphs — the execute pipeline was removed from this repo in v2.0. Output is for `mattpocock:tdd` or manual work.
+- **Not for autonomous orchestration.** The output has no `[P]` markers, Stages, or dependency graphs — the execute pipeline was removed from this repo in v2.0. Output is for the goal feature or manual work.
 
 ## How to do it wrong vs right
 
@@ -85,7 +83,7 @@ Turn a clean spec into a readable, implementation-ready **plan**: atomic vertica
 
 ## Writing style for the plan
 
-> Sharpen/terminology/cross-ref rules borrowed from `mattpocock:grill-with-docs` (MIT). The "challenge the task" and "assumptions & open questions" moves are borrowed from [malakhov-dmitrii/fusion](https://github.com/malakhov-dmitrii/fusion) (MIT). Applies in step 2 (questioner) and steps 3-5 (decomposition / requirements / edge cases).
+> The "challenge the task" and "assumptions & open questions" moves are borrowed from [malakhov-dmitrii/fusion](https://github.com/malakhov-dmitrii/fusion) (MIT). Applies in step 2 (questioner) and steps 3-5 (decomposition / requirements / edge cases).
 
 ### Challenge the task before decomposing (multi-angle)
 
@@ -179,22 +177,23 @@ Everything that needs **you** (the reader) before or during execution goes in **
 - Assume JWT, not sessions (medium — input didn't say).
 ```
 
-### tasks.md is a lean checklist; full task detail lives in reference.md
+### tasks.md: checklist on top, full task blocks below
 
-The tasks file is a **tracker, not a spec dump** — the whole plan visible and checkable at a glance. The verbose per-task detail (files, proof, edge cases) lives in `reference.md` under `## Task details`, read when you actually implement a given task.
+The tasks file holds the whole plan — but **checklist first, detail after**, so it's scannable and trackable without scrolling. The reference is the "why" only.
 
-- `tasks.md` → `## Tasks` is a **checklist**: one line per task, **`- [ ] TASK-n — short title`** (≤ ~6 words), grouped under `**▸ AREA-n**` / `**US-n**` (each group once, foundations-first), with light inline flags `· after TASK-x` (a real prerequisite) / `· HITL` / `· ❓` (gated by a `## Needs your attention` item). Bare `TASK-n` — no `### TASK-n` here. No graph, no `[P]`, no Stages.
-- `reference.md` → `## Task details` holds the full `### TASK-n` blocks — `**Files**`, `**Leverage**`, the `Done when:` shell proof, inline `Edge:` — grouped by `▸ AREA-n` mirroring the checklist order. **`Done when:` (the acceptance contract) lives here; `/verify-done` and goal-prep read the proofs from `## Task details`.**
-- One-to-one: every checklist `TASK-n` has exactly one `### TASK-n` detail block, and vice-versa.
+- `tasks.md` → **`## Checklist`** — one line per task, **`- [ ] TASK-n — short title`** (≤ ~6 words), grouped under `**▸ AREA-n**` / `**US-n**` (each group once, foundations-first), with light inline flags `· after TASK-x` (a real prerequisite) / `· HITL` / `· ❓` (gated by a `## Needs your attention` item). Bare `TASK-n` (the `### TASK-n` headers belong to the blocks below). The at-a-glance map + GFM-checkbox progress tracker. No graph, no `[P]`, no Stages.
+- `tasks.md` → **`## Tasks`** — the full `### TASK-n` blocks below the checklist (`**Files**`, `**Leverage**`, the `Done when:` shell proof, inline `Edge:`), grouped by `▸ AREA-n` in the same order. `Done when:` (the acceptance contract) lives here; `/verify-done` and goal-prep read the proofs from these blocks.
+- `reference.md` → **context only** (`## Overview` / `## Requirements` / `## Assumptions` / `## Risks` / `## Non-goals`) — NO task blocks. The "why", read once.
+- One-to-one: every `## Checklist` line has exactly one `### TASK-n` block below, and vice-versa.
 
-### Keep the reference concise and DRY — lossless
+### Keep the plan concise and DRY — lossless
 
-The reference is the plan's body now, so keep it **tight and non-redundant**: state each fact ONCE, in the section it belongs to, and cross-reference instead of repeating. Tighten prose to facts — cut filler, hedging, restatement — but **never drop a fact** (every requirement, decision, assumption, risk, edge case, and code-pointer the input or your analysis produced must survive somewhere).
+Keep the plan **tight and non-redundant**: state each fact ONCE and cross-reference instead of repeating. Tighten prose to facts — cut filler, hedging, restatement — but **never drop a fact** (every requirement, decision, assumption, risk, edge case, and code-pointer the input or your analysis produced must survive somewhere).
 
-- **No cross-section duplication.** A fact lives in exactly one of `## Overview` / `## Requirements` / `## Assumptions` / `## Risks` / `## Non-goals` / `## Task details`. If Requirements states it, Overview points at it — doesn't restate it. A per-task specific (a path, a proof, an edge) lives only in that task's `### TASK-n` block, not also in a context table.
+- **No cross-section duplication.** A fact lives in exactly one place — `## Overview` / `## Requirements` / `## Assumptions` / `## Risks` / `## Non-goals` (reference) or a task's `### TASK-n` block (tasks). The `## Checklist` line is just a pointer + short title; it doesn't restate the block. If Requirements states it, Overview points at it — doesn't restate it.
 - **Structured facts → a table/matrix**, one row per fact, instead of repeating prose.
 - **Merge near-duplicates:** two paragraphs saying the same thing → one; two risks that are the same risk → one line.
-- **Lossless check:** after tightening, every distinct fact from the pre-edit reference (and the `<spec>.bak`) is still findable. Compression removes words and repetition — never information.
+- **Lossless check:** after tightening, every distinct fact from the original notes is still findable. Compression removes words and repetition — never information.
 
 ## Roles
 
@@ -210,9 +209,9 @@ Substitutions:
 
 | Variable | Source |
 |---|---|
-| `{spec_path}` | the spec file after step 6 (write) |
+| `{spec_path}` | the tasks file after step 6 (write) — `<spec-stem>/tasks.md` or `<spec>.md` |
 | `{round}` | round counter in Phase 7.6 (1, 2, 3) |
-| `{spec_path}.bak` | original spec (pre-enrichment) for coverage check |
+| `{original_baseline}` | pre-enrichment content for the coverage check: the untouched `<spec>.md` (directory mode) or `git show pre-blueprint:<spec>` |
 | `{codex_prompt}` | full text content of `roles/codex-reviewer.md` (entire file, passed as the review prompt) |
 
 Invocations:
@@ -281,26 +280,18 @@ $(cat "$spec_path")"
    - Features / endpoints / edge cases present in the input with no backing task or silently dropped from a task's coverage.
 
    If any signal is found, surface a batched AskUserQuestion (multiSelect=false, one question per item, up to 4 per call — batch into multiple calls if more) with options `Keep deferred (current)` / `Include in v1` / `Drop entirely` / `Drop (record in the plan)`. Apply user decisions to the in-memory plan. For `Drop (record in the plan)`, note it in one line under the reference file's `## Non-goals` (what + why) — no separate files. Loop back to step 3/4 if scope changes require re-decomposition. NEVER write to disk while scope cuts are unconfirmed. If the audit finds nothing — gate silently passes.
-6. **Write the plan.** Back up the original (`<spec>.bak`). The plan is normally **two files**. **When the plan is more than one file, put them in a flat directory `<spec-stem>/`** (named after the spec, e.g. `auth-spec.md` → `auth-spec/`) — **no nested subdirectories**. A trivial spec that fits one file stays as `<spec>.md` (no directory).
-   - **`<spec-stem>/tasks.md` — the at-a-glance tracker.** In this order: a `> Task detail + context: see reference.md` pointer line; **`## Needs your attention`** (only if it has content — blocking `❓ NEEDS YOU` forks each ending in `→ blocks: TASK-n`, plus one line per HITL task); then **`## Tasks`** — a **checklist**, one `- [ ] TASK-n — short title` line per task, grouped by `**▸ AREA-n**` (each group once, foundations-first), with light `· after TASK-x` / `· HITL` / `· ❓` flags. No `### TASK-n` blocks here.
-   - **`<spec-stem>/reference.md` — the plan body + context (read on demand).** `## Overview` narrative, full `## Requirements` (`[must]/[nice]/[later]` + rationale), Terminology, **`## Assumptions`** (ranked **non-blocking** only — blocking `❓ NEEDS YOU` live in tasks.md, never here), `## Risks` (hard-to-reverse decisions, one line each), `## Non-goals`, and **`## Task details`** — the full `### TASK-n` blocks (`**Files**`, `**Leverage**`, `Done when:` shell proof, inline `Edge:`), grouped by `▸ AREA-n` mirroring the checklist order. Keep it **concise and DRY — lossless** (each fact once, cross-ref don't repeat; cut words and dupes, never facts). **`Done when:` lives here — it's the downstream contract `/verify-done` + goal-prep read.**
-   - **Single-file fallback:** a trivial spec → just `<spec>.md` holding `## Overview`, the `## Tasks` checklist, and `## Task details` (no directory, no separate reference).
-   - **Self-sufficiency rule:** to execute TASK-n, read its `### TASK-n` block in the reference (the `Done when:` IS the acceptance); the checklist tells you what's left and in what order. Every checklist `TASK-n` ↔ exactly one `### TASK-n` detail block.
-   - **Threshold:** split when non-trivial (the default → directory form); a trivial / single-component spec may stay one file `<spec>.md`. Downstream readers resolve the tasks checklist as `<spec-stem>/tasks.md` (or `<spec>.md`), and the `### TASK-n` proofs in `<spec-stem>/reference.md` `## Task details` (or the single file's `## Task details`).
+6. **Write the plan.** The plan is normally **two files**. **When the plan is more than one file, put them in a flat directory `<spec-stem>/`** (named after the spec, e.g. `auth-spec.md` → `auth-spec/`) — **no nested subdirectories**. A trivial spec that fits one file stays as `<spec>.md` (no directory). **No `.bak`** — in directory mode the original `<spec>.md` is left untouched (it IS the backup), and the git `pre-blueprint` snapshot covers both modes.
+   - **`<spec-stem>/tasks.md` — the plan (checklist on top, blocks below).** In this order: a `> Context (the "why"): see reference.md` pointer line; **`## Needs your attention`** (only if it has content — blocking `❓ NEEDS YOU` forks each ending in `→ blocks: TASK-n`, plus one line per HITL task); **`## Checklist`** — one `- [ ] TASK-n — short title` line per task, grouped by `**▸ AREA-n**` (each group once, foundations-first), with light `· after TASK-x` / `· HITL` / `· ❓` flags (bare `TASK-n`, no `###`); then **`## Tasks`** — the full `### TASK-n` blocks (`**Files**`, `**Leverage**`, `Done when:` shell proof, inline `Edge:`), grouped by `▸ AREA-n` in the same order. This is the downstream contract — `/goal`, per-stage sub-agents, `/verify-done`, and goal-prep read THIS file (the `## Tasks` blocks' `Done when:` proofs).
+   - **`<spec-stem>/reference.md` — context only (the "why", read once).** `## Overview` narrative, full `## Requirements` (`[must]/[nice]/[later]` + rationale), Terminology, **`## Assumptions`** (ranked **non-blocking** only — blocking `❓ NEEDS YOU` live in tasks.md, never here), `## Risks` (hard-to-reverse decisions, one line each), `## Non-goals`. **NO task blocks.** Keep it **concise and DRY — lossless** (each fact once, cross-ref don't repeat; cut words and dupes, never facts).
+   - **Single-file fallback:** a trivial spec → just `<spec>.md` holding `## Needs your attention` (if any), `## Checklist`, `## Tasks`, and the context sections folded in (no directory, no separate reference).
+   - **Self-sufficiency rule:** to execute TASK-n, read its `### TASK-n` block in `## Tasks` (the `Done when:` IS the acceptance); the `## Checklist` tells you what's left and in what order. Every checklist line ↔ exactly one `### TASK-n` block.
+   - **Threshold:** split when non-trivial (the default → directory form); a trivial / single-component spec may stay one file `<spec>.md`. Downstream readers resolve the tasks file as `<spec-stem>/tasks.md` (or `<spec>.md`) and read the `### TASK-n` blocks + `Done when:` from its `## Tasks`.
 
    Template structures: see `references/task-format.md`.
 7. **Mechanical validation.** `python3 scripts/verify-spec.py <spec>`. FAIL → fix and re-run. (Style warnings about old ceremony are non-blocking but worth clearing.)
 8. **Cross-model consensus loop (Phase 7.6).** External reviewer(s) find, Claude self-assesses, iterate until CONSENSUS or max rounds. Details — next section. Can be skipped with `--consensus-rounds 0`.
 9. **Approval gate.** Summary report + AskUserQuestion (Approve / Modify / Questions). After approval, proceed to step 10.
-10. **Backup disposition + downstream offer.** Spec is approved — `<spec>.bak` is no longer load-bearing. First AskUserQuestion (backup):
-    1. **Delete `<spec>.bak`** (default, recommended) — `rm <spec>.bak`. Rollback still possible via `git checkout HEAD -- <spec>` (the `pre-blueprint: <name>` snapshot from step 6 holds the original).
-    2. **Keep `<spec>.bak`** — for further iteration or an extra safety net.
-
-    Then, **only if `/to-prd` is installed** (Glob check: `~/.claude/skills/to-prd/SKILL.md` exists), a second AskUserQuestion (downstream):
-    1. **Stay local** (default) — `/clear` and continue manually, with `mattpocock:tdd` on the file, or the Claude Code goal feature.
-    2. **Publish to issue tracker via `/to-prd`** — print the literal instruction `Type /to-prd next to wrap this spec as a PRD and publish.` Do NOT auto-invoke; the user types `/to-prd` themselves.
-
-    If `/to-prd` is not installed, skip the downstream question — print `"Plan approved. /clear before continuing."`.
+10. **Done.** Print a one-line summary + `"Plan written to <path>. /clear before continuing."`. No `.bak` to dispose of — the original `<spec>.md` stays as the backup (directory mode) and the git `pre-blueprint` snapshot is the rollback (`git checkout <spec>`). Hand off to a builder — a human, or the Claude Code goal feature (`/goal-prep` + `/goal`) — and finish with `/verify-done`.
 
 The old "Execution Order" section (Stages, [P] markers, dependency graph for parallel spawn) is GONE in v2.0. It existed for the execute orchestration, which no longer ships.
 
@@ -397,9 +388,9 @@ Output schema (defined by `roles/codex-reviewer.md` and `roles/openrouter-review
 
 ## Outputs
 
-- `<spec-stem>/tasks.md` — the **tracker** (at-a-glance): `## Needs your attention` (if any) + `## Tasks` checklist (`- [ ] TASK-n` per task). (A trivial single-file spec stays as `<spec>.md`.)
-- `<spec-stem>/reference.md` — the **plan body + context**: `## Overview` / `## Requirements` / `## Assumptions` (ranked, non-blocking) / `## Risks` / `## Non-goals` / **`## Task details`** (the `### TASK-n` blocks with `Done when:` proofs — what `/verify-done` + goal-prep read). Concise + DRY, lossless. For a trivial single-file spec these fold into `<spec>.md`.
-- `<spec>.bak` — original before enrichment. Created in step 6, lives through Phase 7.6, offered for deletion at step 10. If deleted, rollback goes through `git checkout HEAD -- <spec>` against the `pre-blueprint: <name>` snapshot.
+- `<spec-stem>/tasks.md` — the **plan** (downstream contract): `## Needs your attention` (if any) + `## Checklist` (`- [ ] TASK-n` per task) + `## Tasks` (the `### TASK-n` blocks with `Done when:` proofs — what `/verify-done` + goal-prep read). (A trivial single-file spec stays as `<spec>.md`.)
+- `<spec-stem>/reference.md` — **context only** (the "why"): `## Overview` / `## Requirements` / `## Assumptions` (ranked, non-blocking) / `## Risks` / `## Non-goals`. Concise + DRY, lossless. For a trivial single-file spec these fold into `<spec>.md`.
+- No `.bak` — the original `<spec>.md` is left untouched (directory mode) and the git `pre-blueprint` snapshot is the rollback.
 
 Git: `pre-blueprint: <name>` (snapshot before) and `blueprint: enrich <name>` (after step 6).
 
@@ -408,16 +399,14 @@ Phase 7.6 internals (per-round findings, applied/rejected/escalated breakdown, p
 ## Connections to other skills
 
 - **Input:** typically after `/cleanup` (sectioned markdown without `[MISSING]` markers). A manually written spec is also fine if structurally valid. Optionally preceded by `/extract-links`.
-- **Upstream (project-level, orthogonal):** `mattpocock:grill-with-docs` for project-wide domain modelling — it owns `CONTEXT.md` (glossary). `/blueprint` does NOT touch `CONTEXT.md`; hard-to-reverse decisions are noted inline in the plan's `## Risks`, not in a `docs/adr/` tree.
-- **Output (on disk):** the plan directory `<spec-stem>/` (`tasks.md` + `reference.md`), or `<spec>.md` for a trivial single-file spec; the original is backed up to `<spec>.bak`, kept until step 10.
-- **Output (optional, in tracker):** Step 10 offers a literal "type `/to-prd` next" instruction if `mattpocock:to-prd` is installed.
-- **Downstream builders:** `mattpocock:tdd` (RED-GREEN-REFACTOR), Claude Code goal feature (autonomous), or manual implementation.
+- **Output (on disk):** the plan directory `<spec-stem>/` (`tasks.md` + `reference.md`), or `<spec>.md` for a trivial single-file spec; the original `<spec>.md` is left untouched (directory mode) as the backup — no `.bak`. Hard-to-reverse decisions are noted inline in the plan's `## Risks`, not in a `docs/adr/` tree.
+- **Downstream builders:** the Claude Code goal feature (`/goal-prep` + `/goal`, autonomous) or manual implementation; finish with `/verify-done`.
 - **Cross-model dependency:** Phase 7.6 uses `codex exec -` ([codex CLI](https://github.com/openai/codex)) and/or a diverse OpenRouter model (`OPENROUTER_API_KEY`). Without either — graceful fallback to `roles/spec-validator.md`.
 
 ## Rules
 
 ### Commonality
-The plan is a shared artifact. Downstream work (mattpocock:tdd, goal feature, manual builder) makes decisions from it. If you let a placeholder through, leave a vague `Done when:`, or fail to resolve a contradictory requirement — the next step works from a holey map. Not "helping faster" — breaking the shared work.
+The plan is a shared artifact. Downstream work (the goal feature, a manual builder) makes decisions from it. If you let a placeholder through, leave a vague `Done when:`, or fail to resolve a contradictory requirement — the next step works from a holey map. Not "helping faster" — breaking the shared work.
 
 ### Prior commitment
 In step 5 (self-review) you committed to placeholder scan + consistency + ambiguity check + **Scope-cut audit (user-facing gate)**. In step 7 — `verify-spec.py`. In step 8 — the consensus loop (or fallback). Skipping any step withdraws the basis for the final verdict the user acts on.
@@ -432,18 +421,16 @@ Phase 7.6 exists because single-model self-review is weaker. An independent revi
 
 Would this plan pass review by a senior engineer who has to build the system from it? Concretely:
 
-- Does every `### TASK-n` block (in reference `## Task details`) have a concrete `Done when:` shell proof (not "it works", not "manual check") + a `**Files**` field?
+- Does every `### TASK-n` block (in tasks.md `## Tasks`) have a concrete `Done when:` shell proof (not "it works", not "manual check") + a `**Files**` field?
 - No placeholders (`TBD`, `...`, `[NEEDS CLARIFICATION]`, `<insert here>`) in either file?
 - **Was the step 5 Scope-cut audit run**, with every detected deferral (`[later]`, `Non-goals` items, dropped input features/edge cases) confirmed by the user via AskUserQuestion? No silent deferral.
 - Were hard-to-reverse decisions noted inline in `## Risks` (one line each) — not turned into `docs/adr/` files?
 - Is every task atomic — 1-3 files, single purpose, closeable by an independent worker without questions to the author?
 - **Foundations first:** does the first task leave the project runnable/green (greenfield skeleton + smoke test, or brownfield baseline proof)? Is the test harness in that task and reused — not buried in a later one? Does each area appear exactly once, prerequisites before dependents?
 - **One attention surface:** are ALL blocking `❓ NEEDS YOU` items in tasks.md `## Needs your attention` (each with `→ blocks: TASK-n`) plus the HITL tasks — with NONE of them duplicated in reference.md? Does reference.md carry only the ranked **non-blocking** `## Assumptions`?
-- **Checklist ↔ details:** is tasks.md `## Tasks` a checklist (one `- [ ] TASK-n` per task, bare ids not `###`, each area once), and does every checklist task have exactly one `### TASK-n` block in reference `## Task details` (and vice-versa)?
-- **Reference is concise + DRY + lossless:** no fact stated in two sections; per-task specifics only in `## Task details`; near-duplicate prose/risks merged — yet every requirement, decision, assumption, risk, edge, and code-pointer survives somewhere?
+- **Checklist ↔ blocks:** is tasks.md's `## Checklist` one `- [ ] TASK-n` line per task (bare ids not `###`, each area once), and does every checklist line have exactly one `### TASK-n` block below in `## Tasks` (and vice-versa)?
+- **Concise + DRY + lossless:** no fact stated in two sections; per-task specifics only in their `### TASK-n` block; near-duplicate prose/risks merged — yet every requirement, decision, assumption, risk, edge, and code-pointer survives somewhere?
 - Plan written as a flat `<spec-stem>/` directory (`tasks.md` checklist + `reference.md` body) — or a single `<spec>.md` if trivial; no nested subdirs?
 - Did Phase 7.6 pass (or was it explicitly skipped with reasoning)?
 - Coverage: does every Overview item have at least one task? Does every task track back to Overview / a requirement?
-- Was the user offered keep-or-delete `<spec>.bak` at step 10?
-
 If "no" on any item — redo, don't ship.

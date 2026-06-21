@@ -245,14 +245,14 @@ Create directory + empty `notes/` for future user artifacts.
 
 ### Phase 5.1 — Derive completion from a `/blueprint` plan (when applicable)
 
-If the goal input is a `/blueprint` plan — the `<spec-stem>/tasks.md` checklist passed via `--from` (or `<spec>.md`), or named in `intake.existing_plan_facts` — detect it **structurally**: the plan contains `### TASK-{N}` blocks AND `Done when:` lines (in `reference.md` `## Task details`, or the single file's `## Task details`; don't trigger on a lone keyword). Reading the plan is intake, not execution — it's the goal's specification.
+If the goal input is a `/blueprint` plan — `<spec-stem>/tasks.md` passed via `--from` (or `<spec>.md`), or named in `intake.existing_plan_facts` — detect it **structurally**: the tasks file's `## Tasks` contains `### TASK-{N}` blocks AND `Done when:` lines (don't trigger on a lone keyword). Reading the plan is intake, not execution — it's the goal's specification.
 
 When detected:
 
 - Set `intake.completion_proof` = "every task's `Done when:` proof passes (each PASS — none FAIL/UNKNOWN) and every `[must]` requirement is satisfied", reusing blueprint's **PASS / FAIL / UNKNOWN** vocabulary (`skills/blueprint/references/task-format.md`).
 - Capture one audit row per `### TASK-{N}` (Requirement = task title, Evidence = its `Done when:` command) — Phase 8.5 pre-fills the audit table from these.
-- Read the **`## Task details`** in `<spec-stem>/reference.md` (or the single `<spec>.md`) for the `### TASK-n` blocks + their `Done when:` proofs; the `## Tasks` checklist in `tasks.md` gives the task list/order; read the reference's context sections for non-goals/intent. Completion comes from the `Done when:` proofs — never from the implementation the tasks point at.
-- If `tasks.md` has a **`## Needs your attention`** block, lift its blocking `❓ NEEDS YOU` items into `intake.existing_plan_facts` and append "resolve all `## Needs your attention` items before declaring done" to `completion_proof` — they are gating preconditions, not optional. Use the `## Tasks` checklist order (foundations-first) as the suggested execution order; do the first task's runnable/green baseline before anything that builds on it.
+- Read the **`## Tasks`** `### TASK-n` blocks in `<spec-stem>/tasks.md` (or the single `<spec>.md`) for the proofs; the `## Checklist` gives the task list/order; the sibling `reference.md` is context for non-goals/intent. Completion comes from the `Done when:` proofs — never from the implementation the tasks point at.
+- If `tasks.md` has a **`## Needs your attention`** block, lift its blocking `❓ NEEDS YOU` items into `intake.existing_plan_facts` and append "resolve all `## Needs your attention` items before declaring done" to `completion_proof` — they are gating preconditions, not optional. Use the `## Checklist` order (foundations-first) as the suggested execution order; do the first task's runnable/green baseline before anything that builds on it.
 
 This makes the charter's completion gate an objective projection of the plan, not hand-written prose. (Non-blueprint goals keep deriving `completion_proof` from intake as before.)
 

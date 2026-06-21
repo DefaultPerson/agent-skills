@@ -39,7 +39,7 @@ Multi-file: each input is processed independently end-to-end. Output is N cleane
 - **Context cost grows linearly with input size.** Phase 4 (gap detection) spawns background agents on large files — watch your budget. For files >2000 lines, consider splitting the input.
 - **Does not work with non-markdown formats.** JSON/YAML/code dumps — use a different tool.
 - **Does not extract content from links** (YouTube, Telegram). For that, run `/extract-links` before `/cleanup`.
-- **Does not summarize.** This skill is preservation-first; if you want to shrink ideas, use a different tool (e.g. `mattpocock:to-prd` for PRD-style summarization).
+- **Does not summarize.** This skill is preservation-first; if you want to shrink ideas, use a different tool for PRD-style summarization.
 
 ## How to do it wrong vs right
 
@@ -65,7 +65,7 @@ Multi-file: each input is processed independently end-to-end. Output is N cleane
 
 ### Standalone framing
 
-❌ **Wrong:** Phase 9 report ends with `Recommend: /clear then /blueprint <file>`. That's a presupposition — the user might be going to `mattpocock:tdd`, to a goal feature, or nowhere at all.
+❌ **Wrong:** Phase 9 report ends with `Recommend: /clear then /blueprint <file>`. That's a presupposition — the user might be going to a goal feature, a builder, or nowhere at all.
 
 ✅ **Right:** End with one line: `Cleanup done. Run /clear before continuing.` Don't recommend downstream skills. The user decides what's next.
 
@@ -120,13 +120,13 @@ Git: two commits per source — `pre-cleanup: <name>` (snapshot) and `cleanup: r
 ## Connections to other skills
 
 - **Input:** typically a raw file from notes/chat. Can be invoked standalone, or after `/extract-links` if the notes contain URLs.
-- **Output:** valid sectioned markdown without unresolved markers. What to do with it is the user's call (manual edit, `/blueprint`, `mattpocock:to-prd`, direct goal-feature input, etc.).
+- **Output:** valid sectioned markdown without unresolved markers. What to do with it is the user's call (manual edit, `/blueprint`, direct goal-feature input, etc.).
 - **Does not call** other skills automatically. After step 9: `Cleanup done. Run /clear before continuing.` — no downstream recommendation.
 
 ## Rules
 
 ### Commonality
-The pipeline is preservation-first because the next steps (blueprint, manual edit, mattpocock) assume nothing was lost. If you let a dropped idea pass through Phase 4 as "probably unimportant", the next step works from a holey map. That is not "helping faster" — it is breaking the shared work.
+The pipeline is preservation-first because the next steps (blueprint, manual edit, a builder) assume nothing was lost. If you let a dropped idea pass through Phase 4 as "probably unimportant", the next step works from a holey map. That is not "helping faster" — it is breaking the shared work.
 
 ### Prior commitment
 In step 3 (verify sort) you committed to running the superset check. In step 5 — all three gap-detection levels. In step 8 — the final compare against backup. Skipping any step withdraws the basis for the final verdict. Not "optimization" — contract violation.

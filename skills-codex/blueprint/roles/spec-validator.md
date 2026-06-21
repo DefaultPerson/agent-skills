@@ -6,16 +6,16 @@ If any external reviewer is available (Codex via `roles/codex-reviewer.md`, or a
 
 ## Inputs
 
-- **Spec file:** `{spec_path}` — final enriched plan (after step 6 write).
-- **Original spec:** `{spec_path}.bak` — pre-enrichment original, for coverage cross-check.
+- **Tasks file:** `{spec_path}` — final enriched plan (after step 6 write).
+- **Original baseline:** the untouched `<spec>.md` (directory mode) or `git show pre-blueprint:<spec>` — pre-enrichment content, for coverage cross-check.
 
 ## What to check
 
 1. **Template compliance** — required sections present:
-   - tasks.md: `## Tasks` is a **checklist** (one `- [ ] TASK-n — title` per task, grouped by area once); `## Needs your attention` IF any blocking `❓ NEEDS YOU` / HITL items exist (each blocker `→ blocks: TASK-n`), and these must NOT be duplicated in the reference
-   - reference.md: Overview (with original content from `.bak`), Requirements (if multi-component) and any Non-goals, `## Assumptions` (ranked, non-blocking), Risks, and **`## Task details`** — the full `### TASK-n` blocks (each with `**Files**` + a `Done when:` shell proof)
-   - Every checklist `TASK-n` ↔ exactly one `### TASK-n` detail block
-   - reference is concise + DRY (each fact once, no cross-section duplication) — yet lossless
+   - tasks.md: `## Checklist` (one `- [ ] TASK-n — title` per task, grouped by area once); then `## Tasks` — the full `### TASK-n` blocks (each with `**Files**` + a `Done when:` shell proof); `## Needs your attention` IF any blocking `❓ NEEDS YOU` / HITL items exist (each blocker `→ blocks: TASK-n`), and these must NOT be duplicated in the reference
+   - reference.md: context only — Overview (covering the original baseline content), Requirements (if multi-component) and any Non-goals, `## Assumptions` (ranked, non-blocking), Risks. NO task blocks.
+   - Every checklist `TASK-n` ↔ exactly one `### TASK-n` block in `## Tasks`
+   - the plan is concise + DRY (each fact once, no cross-section duplication) — yet lossless
 2. **Task quality** — every task:
    - Atomic scope (1-3 files in the `**Files**` field)
    - Concrete title (NOT "Implement authentication system")
@@ -50,7 +50,7 @@ Coverage check:
 
 ❌ Complaining about style / formatting / word choice — scope: substance only. (This skill is deliberately plain-language; don't push formality.)
 ❌ Suggesting removal of an "unusual" requirement — surface as `NEEDS_USER`, leave the decision to the user.
-❌ Marking PASS without checking coverage against `.bak`.
+❌ Marking PASS without checking coverage against the original baseline.
 ❌ Marking MAJOR_ISSUES for minor problems — that's the user-escalation level; use it only when the plan isn't really ready.
 
 ## Prior commitment

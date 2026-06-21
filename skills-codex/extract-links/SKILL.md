@@ -10,8 +10,8 @@ description: >
   copy-paste is faster. Triggers: "/extract-links", "extract links",
   "развернуть ссылки", "expand links", "fetch URLs", "извлеки контент".
 when_to_use: >
-  Note has 3+ URLs and downstream work (/cleanup, /blueprint, mattpocock:to-prd,
-  goal feature, manual analysis) needs the content available offline. Do NOT
+  Note has 3+ URLs and downstream work (/cleanup, /blueprint, goal feature,
+  manual analysis) needs the content available offline. Do NOT
   use for a single URL you can just open in browser, for private/auth-required
   resources, or when the user wants to keep the note as URL-references only.
 allowed-tools: [Bash, Read, Edit, Glob, Grep]
@@ -204,7 +204,7 @@ Git:
 ## Connections to other skills
 
 - **Input:** any markdown file with URLs. Usually a note or plan before `/cleanup` or manual review.
-- **Output:** annotated note with local pointers. Suitable for `/cleanup`, `mattpocock:to-prd`, manual analysis, plain reading.
+- **Output:** annotated note with local pointers. Suitable for `/cleanup`, manual analysis, plain reading.
 - **Does not call** other skills automatically. After step 7: `Extracted N URLs from <note>. Run /cleanup next if needed.` — a soft hint for the typical pipeline, not a forced chain.
 
 ## Rules

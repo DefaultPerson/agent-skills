@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.11.0 — 2026-06-21
+
+`/blueprint` plan layout settled: everything lives in **tasks.md** — `## Needs your
+attention` (if any), then a **`## Checklist`** on top (one `- [ ] TASK-n — title`
+line per task, grouped by area, foundations-first), then the full `### TASK-n`
+blocks under **`## Tasks`** (Files, Leverage, `Done when:`, Edge). `reference.md` is
+**context only** now (Overview / Requirements / Assumptions / Risks / Non-goals) —
+no task blocks. (This brings the detail back beside the checklist; supersedes
+0.9.0's reference-side `## Task details` split.) Dropped the `<spec>.bak` backup —
+in directory mode the original `<spec>.md` is left untouched (it is the backup) and
+the git `pre-blueprint` snapshot is the rollback; the step-10 backup prompt is gone.
+Removed `/to-prd` and all references to third-party `mattpocock:*` skills
+(grill-with-docs / tdd / to-prd) across blueprint, cleanup, contracts, extract-links,
+and the LICENSE attribution (the fusion attribution stays). `verify-spec.py`
+reworked for the layout (checklist ↔ block cross-checks; a clear migrate error on
+the old blocks-in-reference layout).
+
 ## 0.10.0 — 2026-06-21
 
 Fixed `/blueprint`'s Phase 7.6 Codex reviewer, which was silently no-op'ing. On

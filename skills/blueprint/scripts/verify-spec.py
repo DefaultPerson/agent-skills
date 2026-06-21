@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """Verify a blueprint plan.
 
-Layout (v0.9.0): the plan is split for at-a-glance tracking —
-  tasks.md     — `## Needs your attention` (if any) + `## Tasks` CHECKLIST
-                 (one `- [ ] TASK-n — title` line per task, grouped by area).
-  reference.md — `## Overview` … `## Task details` with the full `### TASK-n`
-                 blocks (**Files**, `Done when:` shell proof, `Edge:`). The
-                 `Done when:` proofs and `### TASK-n` anchors live HERE now.
-A trivial spec may be a single `<spec>.md` holding both `## Tasks` and
-`## Task details`.
+Layout: the plan lives in tasks.md (the reference holds only context) —
+  tasks.md     — `## Needs your attention` (if any) + `## Checklist`
+                 (one `- [ ] TASK-n — title` line per task, grouped by area)
+                 + `## Tasks` (the full `### TASK-n` blocks below: **Files**,
+                 `Done when:` shell proof, `Edge:`). The proofs + `### TASK-n`
+                 anchors live HERE.
+  reference.md — context only: `## Overview` / `## Requirements` /
+                 `## Assumptions` / `## Risks` / `## Non-goals`. NO task blocks.
+A trivial spec may be a single `<spec>.md` holding everything.
 
 FAIL (exit 1) on structural problems (missing sections/proofs, dangling refs,
-old layout). WARN (still exit 0) on drift + style regressions toward the old
-RFC-2119 / AC-N.N / Given-When-Then ceremony the skill moved away from.
+checklist↔block mismatch, the old "blocks-in-reference" layout). WARN (still
+exit 0) on drift + style regressions toward the old ceremony.
 """
 import sys
 import re
@@ -50,15 +51,15 @@ def section_group_dupes(text, section):
 
 
 def checklist_nums(text):
-    """TASK numbers from `- [ ] TASK-n` rows within the `## Tasks` section."""
-    in_tasks, nums = False, set()
+    """TASK numbers from `- [ ] TASK-n` rows within the `## Checklist` section."""
+    in_sec, nums = False, set()
     for ln in text.splitlines():
-        if ln.startswith("## Tasks"):
-            in_tasks = True
+        if ln.startswith("## Checklist"):
+            in_sec = True
             continue
-        if in_tasks and ln.startswith("## ") and not ln.startswith("## Tasks"):
-            in_tasks = False
-        if in_tasks and (m := CHECK_ROW.match(ln)):
+        if in_sec and ln.startswith("## ") and not ln.startswith("## Checklist"):
+            in_sec = False
+        if in_sec and (m := CHECK_ROW.match(ln)):
             nums.add(m.group(1))
     return nums
 
@@ -134,23 +135,20 @@ def main():
     spec_dir = os.path.dirname(spec_path)
     base = spec_path[:-3] if spec_path.endswith(".md") else spec_path
 
-    # --- Handed the reference file directly → validate context + task-detail blocks, stop. ---
+    # --- Handed the reference file directly → validate it's context-only, stop. ---
     if spec_name == "reference.md" or spec_path.endswith(".reference.md"):
         if "## Overview" not in content:
             errors.append("reference file missing ## Overview")
-        is_product = "## User Stories" in content
-        blocks = task_blocks(content)
-        if "## Task details" in content and not blocks:
-            errors.append("reference has '## Task details' but no `### TASK-n` blocks")
-        check_detail_blocks(blocks, spec_name, errors, warnings, is_product)
-        for k, n in sorted(section_group_dupes(content, "Task details").items()):
-            warnings.append(f"group '▸ {k}' appears {n}× in ## Task details — each group once (split-area)")
-        placeholder_and_dead([(spec_name, content)], content, errors)
+        if task_blocks(content):
+            errors.append("reference file contains `### TASK-n` blocks — task blocks belong in "
+                          "tasks.md `## Tasks`, not the reference")
+        if "## Task details" in content:
+            warnings.append("reference has a '## Task details' section — task detail moved to "
+                            "tasks.md `## Tasks`")
         style_warnings([(spec_name, content)], warnings)
-        report(errors, warnings, f"reference file: {len(blocks)} task blocks, "
-                                 f"all with Files + a Done-when proof")
+        report(errors, warnings, "reference file (context) looks well-formed")
 
-    # --- Otherwise: the tasks file (checklist). Resolve the reference. ---
+    # --- Otherwise: the tasks file. Resolve the (context-only) reference. ---
     ref_candidates = []
     if spec_name == "tasks.md":
         ref_candidates.append(os.path.join(spec_dir, "reference.md"))   # directory form
@@ -162,50 +160,47 @@ def main():
         with open(ref_path) as rf:
             ref_content = rf.read()
 
-    detail = ref_content if two_file else content        # where the `### TASK-n` blocks live
-    detail_label = os.path.basename(ref_path) if two_file else spec_name
-    files = [(spec_name, content)] + ([(detail_label, ref_content)] if two_file else [])
+    files = [(spec_name, content)] + ([(os.path.basename(ref_path), ref_content)] if two_file else [])
 
-    # --- Old layout guard: `### TASK-n` blocks in the tasks file with no `## Task details`. ---
-    if task_blocks(content) and "## Task details" not in content:
-        errors.append("tasks file holds `### TASK-n` blocks directly — the current layout keeps a "
-                      "`- [ ] TASK-n` checklist in tasks.md and moves the full `### TASK-n` detail to "
-                      "reference.md `## Task details`. Migrate the plan (see blueprint).")
-        report(errors, warnings, "old layout")
+    # --- Old "blocks in reference" layout guard (v0.9–v0.10) → clear migrate error. ---
+    if two_file and ("## Task details" in ref_content or task_blocks(ref_content)):
+        errors.append(f"{os.path.basename(ref_path)} holds task blocks (`## Task details` / `### TASK-n`) "
+                      "— the current layout keeps the full `### TASK-n` blocks in tasks.md `## Tasks` "
+                      "(below the `## Checklist`) and reference.md is context-only. Migrate the plan.")
+        report(errors, warnings, "old layout (blocks in reference)")
 
     # --- Required sections ---
-    if "## Tasks" not in content:
-        errors.append("tasks file missing required section: ## Tasks (the checklist)")
+    for sec in ("## Checklist", "## Tasks"):
+        if sec not in content:
+            errors.append(f"tasks file missing required section: {sec}")
     if two_file:
         if "## Overview" not in ref_content:
-            errors.append(f"{detail_label} missing ## Overview")
-        if "## Task details" not in ref_content:
-            errors.append(f"{detail_label} missing ## Task details (the `### TASK-n` blocks)")
+            errors.append(f"{os.path.basename(ref_path)} missing ## Overview")
     else:
-        for sec in ("## Overview", "## Task details"):
-            if sec not in content:
-                errors.append(f"single-file spec missing required section: {sec}")
+        if "## Overview" not in content:
+            errors.append("single-file spec missing required section: ## Overview")
 
-    is_product = "## User Stories" in content or "## User Stories" in detail
-    has_requirements = "## Requirements" in detail or "## Contracts" in detail
+    is_product = "## User Stories" in content
+    has_requirements = "## Requirements" in content or "## Contracts" in content \
+        or "## Requirements" in ref_content
 
     placeholder_and_dead(files, content + "\n" + ref_content, errors)
 
-    # --- Task detail blocks: Files + Done when ---
-    blocks = task_blocks(detail)
+    # --- Task blocks (in tasks.md `## Tasks`): Files + Done when ---
+    blocks = task_blocks(content)
     if not blocks:
-        errors.append(f"no `### TASK-n` blocks found in {detail_label} (expected under '## Task details')")
-    check_detail_blocks(blocks, detail_label, errors, warnings, is_product)
-    detail_nums = {num for num, _, _ in blocks}
+        errors.append("no `### TASK-n` blocks found in tasks file `## Tasks`")
+    check_detail_blocks(blocks, spec_name, errors, warnings, is_product)
+    block_nums = {num for num, _, _ in blocks}
 
-    # --- Checklist ↔ detail cross-checks ---
+    # --- Checklist ↔ block cross-checks ---
     check_nums = checklist_nums(content)
     if not check_nums:
-        errors.append("## Tasks has no `- [ ] TASK-n` checklist rows")
-    for num in sorted(check_nums - detail_nums, key=int):
-        errors.append(f"checklist TASK-{num} has no `### TASK-{num}` block in {detail_label} ## Task details")
-    for num in sorted(detail_nums - check_nums, key=int):
-        warnings.append(f"TASK-{num} has a detail block but is missing from the ## Tasks checklist")
+        errors.append("`## Checklist` has no `- [ ] TASK-n` rows")
+    for num in sorted(check_nums - block_nums, key=int):
+        errors.append(f"checklist TASK-{num} has no `### TASK-{num}` block in `## Tasks`")
+    for num in sorted(block_nums - check_nums, key=int):
+        warnings.append(f"TASK-{num} has a block but is missing from the `## Checklist`")
 
     # --- Needs your attention: `→ blocks: TASK-n` must resolve (dangling = FAIL) ---
     if "## Needs your attention" in content:
@@ -214,24 +209,24 @@ def main():
             if not m or re.search(r'\ball\b', m.group(1)):
                 continue
             for num in re.findall(r'TASK-(\d+)', m.group(1)):
-                if num not in check_nums and num not in detail_nums:
+                if num not in check_nums and num not in block_nums:
                     errors.append(f"{spec_name} line {i}: '## Needs your attention' blocks a "
                                   f"non-existent TASK-{num}")
 
-    # --- Split-area (each group once) in checklist and in details (WARN) ---
-    for txt, lbl, sec in [(content, spec_name, "Tasks"), (detail, detail_label, "Task details")]:
-        for k, n in sorted(section_group_dupes(txt, sec).items()):
-            warnings.append(f"group '▸ {k}' appears {n}× in {lbl} ## {sec} — each area/story "
-                            "group should appear exactly once (split-area bug)")
+    # --- Split-area (each group once) in Checklist and Tasks (WARN) ---
+    for sec in ("Checklist", "Tasks"):
+        for k, n in sorted(section_group_dupes(content, sec).items()):
+            warnings.append(f"group '▸ {k}' appears {n}× in ## {sec} — each area/story group "
+                            "should appear exactly once (split-area bug)")
 
     # --- One attention surface: no blocking duplication / old heading in reference (WARN) ---
     if two_file:
         if re.search(r'❓\s*\*{0,2}\s*NEEDS YOU', ref_content):
-            warnings.append(f"{detail_label} carries a blocking '❓ NEEDS YOU' — keep blockers only in "
-                            "tasks.md '## Needs your attention' (one attention surface)")
+            warnings.append(f"{os.path.basename(ref_path)} carries a blocking '❓ NEEDS YOU' — keep "
+                            "blockers only in tasks.md '## Needs your attention'")
         if "## Assumptions & open questions" in ref_content:
-            warnings.append(f"{detail_label} uses old heading '## Assumptions & open questions' — "
-                            "rename to '## Assumptions' (ranked, non-blocking only)")
+            warnings.append(f"{os.path.basename(ref_path)} uses old heading "
+                            "'## Assumptions & open questions' — rename to '## Assumptions'")
 
     if is_product and not has_requirements:
         warnings.append("Product spec has '## User Stories' but no '## Requirements' section")

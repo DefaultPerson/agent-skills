@@ -20,11 +20,6 @@ Portions of this work are adapted from third-party sources:
   into skills/autoresearch/references/codex-integration.md.
   https://github.com/openai/codex-plugin-cc
 
-- mattpocock/skills `grill-with-docs` (MIT) — the sharpen / terminology /
-  cross-reference rules used in /blueprint's questioner and decomposition.
-  Adapted into skills/blueprint/.
-  https://github.com/mattpocock/skills
-
 - Cursor team-kit `thermo-nuclear-code-quality-review`
   (https://github.com/cursor/plugins, commit 3347cba) — the
   implementation-quality / maintainability review substance (the

@@ -1,6 +1,6 @@
 # Requirements & contracts — step 4 detail
 
-Step 4 in blueprint pins down the **interfaces between components** so downstream work (manual / `mattpocock:tdd` / goal feature) doesn't trip on ambiguous boundaries. Skip when the spec is small or a single-component technical change.
+Step 4 in blueprint pins down the **interfaces between components** so downstream work (manual / goal feature) doesn't trip on ambiguous boundaries. Skip when the spec is small or a single-component technical change.
 
 > **Plain sentences, not RFC ceremony.** Write each requirement as one clear sentence a human reads in a second, tagged by priority. No `MUST`/`SHOULD`/`MAY` shouting, no mandatory `FR-NNN` numbering. The point is an unambiguous boundary, not a compliance document.
 
